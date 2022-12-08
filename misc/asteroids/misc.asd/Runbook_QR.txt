@@ -1,0 +1,253 @@
+###
+### Initial setup
+###
+
+## Check your env for proper setup.
+% env | sort | grep -iE 'arcade|asteroid|aws|bucket'
+
+## Test that the 'arcade' command works and you have the required AWS connection configured correctly.
+% arcade test aws -v
+## If this doesn't work, you may need to add the arcade/bin directory to you path and setup your
+## AWS account keys.
+## If you are using a new style account, you may need to login with "aws sso login --profile <profile_name>".
+
+## Get started.
+% cd ${GIT_HOME}/arcade
+
+
+###
+### Gravatar
+###
+
+## Create the base Gravatar layer. Choose the region you want.
+% arcade grv create -y -r ${AWS_REGION}
+## If the above fails for some reason, find the command printed in the output of the above that looks
+## like this and run it. The second time it almost always works.
+## Timing: About 15 minutes overall...
+% arcade grv create -i /...
+
+
+###
+### Galaga
+###
+
+## Now you have an arcade. The name of the arcade will be reported in the output of the
+## above grv create command. Set up the env with the arcade name.
+## Note: All commands that need an arcade name passed in should allow getting it from the
+## environment. Please let us know if that isn't the case!
+% export ARCADE_NAME=<arcade_name>
+% echo ${ARCADE_NAME}
+
+## For predefined galaga file below is required because it includes all the necessary components.
+## Timing: ~30 minutes.
+% arcade galaga create -p galaga/someplace/default.json
+
+## In cases where there is no pre-defined galaga file, you may want to create
+## your own galaga file. Your galaga file may not require all of the modules below. Be sure to
+## remove or add any as required. That can be done with the following commands. However it is
+## best to create a standard galaga file for your use and stick with it.
+##
+## Upload the GSD files
+##
+## # Be sure to name your tag so it is unique and descriptive!
+## MY_GALAGA_TAG=mytag
+## % arcade gsd upload -f libexec/galaga-modules/asteroids-eks/asteroids-eks.json -t ${MY_GALAGA_TAG}
+## % arcade gsd upload -f libexec/galaga-modules/asteroids-msk/asteroids-msk.json -t ${MY_GALAGA_TAG}
+## % arcade gsd upload -f libexec/galaga-modules/secretsmanager/secretsmanager.json -t ${MY_GALAGA_TAG}
+## % arcade gsd upload -f libexec/galaga-modules/eks-fluentd/eks-fluentd.json -t ${MY_GALAGA_TAG}
+## % arcade gsd upload -f libexec/galaga-modules/log-relay/log-relay.json -t ${MY_GALAGA_TAG}
+## % arcade gsd upload -f libexec/galaga-modules/prometheus/prometheus.json -t ${MY_GALAGA_TAG}
+##
+## Setup the GALAGA file with overrides
+##
+## % arcade galaga setup -C -p gsd/asteroids-eks/${MY_GALAGA_TAG}.json -p gsd/asteroids-msk/${MY_GALAGA_TAG}.json -p gsd/secretsmanager/${MY_GALAGA_TAG}.json -p gsd/eks-fluentd/${MY_GALAGA_TAG}.json -p gsd/log-relay/${MY_GALAGA_TAG}.json -p gsd/prometheus/${MY_GALAGA_TAG}.json -o "asteroids-eks:services/nodegroup/service_options/asteroids/nodes=12" -o "asteroids-eks:services/nodegroup/service_options/asteroids/max_nodes=20"
+##
+## Upload the GALAGA userdata
+##
+## % arcade galaga userdata upload -f libexec/galaga-modules/log-relay/log-relay.tpl --gsd log-relay
+##
+## Edit the galaga file manually if you want to change the "name" to something other than "${ARCADE_NAME}".
+##
+## Upload the GALAGA file
+##
+## % arcade galaga upload -f ~/tmp/arcade/${ARCADE_NAME}.json -t ${MY_GALAGA_TAG}
+##
+## Now you have your own custom galaga file with overrides included.
+##
+## % arcade galaga create -p galaga/${ARCADE_NAME}/${MY_GALAGA_TAG}.json
+
+
+###
+### Asteroid
+###
+
+## Choose a unique name. (Run "arcade asteroid list -A ${ARCADE_NAME}" to view what asteroids
+## already exist in your arcade so you don't collide with an existing name.)
+##   The asteroid name must also conform to this Regex pattern: "^[a-z][a-z0-9]{3,23}$" AKA, it
+##   must start with a letter, may contain only letters and numbers, and be between 4 and 24
+##   characters long.
+## Then set ASTEROID_NAME with your chosen asteroid name.
+% export ASTEROID_NAME=obiwan
+% echo ${ASTEROID_NAME}
+## Note: If you want to start more than 1 asteroid in the same arcade, start at this step and
+## then proceed.
+
+## Note: If you want to start more than 1 asteroid in the same arcade, start at this step above
+## and then proceed.
+
+## You can manually tweak the individual asd files, upload them, and add their locations to
+## the ${ASTEROID_NAME}.json file or you can use the upload_and_merge_helper.py script below
+## which will do much of that for you.
+% arcade asd upload -f somefile.json
+% ...
+## Capture the path to these files so the paths can be added to the asteroid file.
+% arcade asteroid create -a ${ASTEROID_NAME}
+## Add the ASD files to the asteroid.
+% arcade asteroid add -a ${ASTEROID_NAME} -p asd/pfdbsmsdb/1/2022/08/31/23/14/56df11ec3ff8b079a916af18d3ac4dcc.json
+% ...
+## Next, make sure the "order" is correct in the asteroid file.
+
+## Note: You may need to do this before you can run any kubectl commands:
+% arcade config kubectl -A ${ARCADE_NAME}
+
+## As the size or number of your asteroids grows you may need to increase the number of nodes in the
+## Auto Scaling Groups in order to handle the additional resource requirements.
+## Currently it requires at least 7 nodes to run a single AoA asteroid.
+##
+## In your browser, navigate to EC2 / Auto Scaling Groups (bottom left) / <select the one for you arcade>
+## / Under "Group details" click on "Edit". The default for "Maximum capacity" is 12. That's sufficient
+## for 1 AoA asteroid. The default for "Desired capacity" is 8. AWS will use as many as required,
+## up to the maximum you set. This works pretty well. If you want to run more asteroids in the
+## same arcade, just multiply the default numbers by the number of asteroids desired.
+## Once applied, wait a few minutes until this kubectl command shows the new nodes listed in your arcade.
+##
+## % kubectl get nodes
+##
+## You should then have the desired number of nodes and be ready to continue.
+##
+## Sometimes if a particular pod shows status of "Pending" it means you don't have enough nodes. If you
+## are quick enough to notice that, increasing the Auto Scaling Groups as above you can make the
+## change before your pod goes past the timeout and is torn down.
+##
+## Setting the min and max nodes can also be accomplished ahead of time with the following galaga setup override options:
+##
+## -o "asteroids-eks:services/nodegroup/service_options/asteroids/nodes=8"
+## -o "asteroids-eks:services/nodegroup/service_options/asteroids/max_nodes=12"
+##
+## The more I research this the more I am inclined to set "max_nodes" to something relatively large like 20 or more!
+##
+## To do the above from the command line, this should work:
+##
+## # Find the Auto Scaling Group 'MinSize', 'DesiredCapacity' and 'MaxSize'.
+## % arcdotname=`echo $ARCADE_NAME | sed 's/\./-/'`
+## # Find the ASG name.
+## % asg_name=`aws autoscaling describe-auto-scaling-groups --query 'AutoScalingGroups[].Tags[?Value==\`asteroids-'$arcdotname'\`].ResourceId[]' --output text`
+## # Find the current setting.
+## % aws autoscaling describe-auto-scaling-groups --region ${AWS_REGION} --query "AutoScalingGroups[?AutoScalingGroupName==\`$asg_name\`].[MinSize,DesiredCapacity,MaxSize]" --output text | awk '{print "Min: " $1 ", Des: " $2 ", Max: " $3}'
+## Min: 12, Des: 12, Max: 20
+## # Set the new values: (Change these numbers as required.)
+## % aws autoscaling update-auto-scaling-group --region ${AWS_REGION} --auto-scaling-group-name ${asg_name} --min-size 10 --desired-capacity 12 --max-size 16
+## # View the new values to confirm they were changed.
+## % aws autoscaling describe-auto-scaling-groups --region ${AWS_REGION} --query "AutoScalingGroups[?AutoScalingGroupName==\`$asg_name\`].[MinSize,DesiredCapacity,MaxSize]" --output text | awk '{print "Min: " $1 ", Des: " $2 ", Max: " $3}'
+## Min: 10, Des: 12, Max: 16
+## # Don't forget to cleanup!
+## % unset asg_name arcdotname
+
+## Now you are ready to upload and enable your asteroid.
+## Be sure to inspect your asteroid json file to make sure it has the correct data.
+% less ${ATMP}/${ASTEROID_NAME}.json
+% arcade asteroid upload -a ${ASTEROID_NAME}
+% export UPLOAD_PATH=<path returned by upload cmd>
+% echo $UPLOAD_PATH
+% arcade asteroid enable -p ${UPLOAD_PATH}
+
+## Cluster role binding is needed to allow the monitor processes access to the things they are monitoring.
+## The "make-XXXX-sa-cluster-admin" string is arbitrary but, if derived from the asteroid name as
+## in the example below, it will be obvious what it belongs to. Do this once for each asteroid.
+## The serviceaccount IS "<clustername>:default".
+## For example:
+% kubectl create clusterrolebinding make-${ASTEROID_NAME}-sa-cluster-admin --serviceaccount=${ASTEROID_NAME}:default --clusterrole=cluster-admin
+# clusterrolebinding.rbac.authorization.k8s.io/make-obiwan-sa-cluster-admin created
+## Note: This command may get your arcade flagged by the security team! This is OK for now but
+## this requirement will be removed before arcades hit production.
+
+## This command activates the asteroid. Once this command finishes running you should have a running asteroid.
+## It's the "Make it so." "Aye aye captian." command!
+% arcade narc reconcile
+
+
+###
+### Monitoring and debugging
+###
+
+## View the services(pods) running and their state.
+% kubectl get pods -n ${ASTEROID_NAME}
+
+## View details of the above pods. Helpful to see why a service stays in STATUS:Pending or other issues.
+% kubectl describe pods -n ${ASTEROID_NAME}
+
+## STATUS:ImagePullBackOff means that it cannot find the specified image. Check the ASD file for that service.
+## narc-pfdb-pfdbperfirmdb-6f94bd87d9-8qlck   0/2     ImagePullBackOff   0          48s
+
+## View all active asteroids.
+% arcade asteroid list -A ${ARCADE_NAME}
+
+## View a service's logs.
+## I put this into a log and run less on it to watch it so I don't lose it if I'm slow.
+% kubectl logs -f --previous=false pod/<name_from_get_pods_above> -n ${ASTEROID_NAME} >& /tmp/svc_name.log &
+% less /tmp/svc_name.log
+
+## View details of all deployments (services(pods) added and enabled above) in this arcade.
+% kubectl get deployments --all-namespaces
+
+## View details of a specific asteroid's deployments.
+% kubectl get deployments -n ${ASTEROID_NAME}
+
+## If the above narc reconcile failed on a component, you can run the following 2 commands to back it
+## off and fix it.
+% arcade asteroid disable -a ${ASTEROID_NAME}
+% arcade narc reconcile
+## Once it is fixed, enable the asteroid again and then narc reconcile again.
+
+## If a service just seems to get skipped over you may have leftover configmaps. You can run this
+## command to see if there are any leftover configs.
+% kubectl get configmap -n ${ASTEROID_NAME}
+
+## If there are leftover configmaps, run this to delete any that shouldn't be there. Aka, any that
+## don't have a currently running asteroid service(pod).
+## Don't remove the 'kube-root-ca.crt' configmap.
+% kubectl delete configmap -n ${ASTEROID_NAME} <from_above>
+## Or use this one to nuke all the ones you should nuke and start over clean.
+% kubectl get configmap -n ${ASTEROID_NAME} | grep narc-${ASTEROID_NAME} | awk '{print $1}' | xargs kubectl delete configmap -n ${ASTEROID_NAME}
+## Then try narc reconcile again after they are deleted.
+
+## Connect to ec2 instance:
+% kubectl get pods -n ${ASTEROID_NAME}
+% kubectl exec -it <select a name from the list above> -n ${ASTEROID_NAME} -- /bin/bash
+## Install telnet:
+% apt clean; apt update; apt install telnet
+## From there you can use telnet to test memcached (ElastiCache) for instance:
+% telnet genname-aws.asdfas.cfg.usw2.cache.amazonaws.com 11211
+
+## Connect to webservice to see if things are running.
+## Note: If you are using chrome and it complains about expired certs, click on the page and type 'thisisunsafe'
+## Option 1: use port forwarding
+## Determine the kubernetes pod running webservice.
+% kubectl get po -n ${ASTEROID_NAME} | grep webservice
+## Setup a port forward:
+% sudo kubectl port-forward pod/<pod_name_from_above> 443:443 -n ${ASTEROID_NAME}
+## In your browser connect to: https://localhost
+## Note: You likely won't be able to actually login via this method.
+
+## Option 2: route to the appropriate subdomain
+% kubectl edit svc webservice -n ${ASTEROID_NAME}
+## Change NodePort to LoadBalancer, then wait about a minute
+## Now make sure the change went into effect:
+% kubectl describe svc webservice -n ${ASTEROID_NAME} | grep -E 'LoadBalancer Ingress:'
+## Take the AWS CNAME from "LoadBalancer Ingress" and find ONE of it's IP addresses:
+% dig <CNAMEFromAbove> | grep '60 IN A'
+## Add the following to your /etc/hosts:
+% sudo vi /etc/hosts
+<IP ADDRESS> webservice.addemea.com terrabella.addemea.com
+## Test it out: https://terrabella.addemea.com
+## Note: You should be able to get logged in here!

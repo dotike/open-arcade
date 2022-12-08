@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+galagazero-update -- GALAGA update ARCADE/Account Infrastructure components.
+'''
+
+# @depends: boto3, python (>=3.9)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Update ARCADE/Account infrastructure components."
+
+
+import argparse
+import logging
+import os
+from pprint import pprint
+import sys
+
+from arclib import common
+from arclib import grv
+from arclib import log
+from arclib import secrets_manager
+from arclib import storage
+from arclib.common import print_status
+
+
+def main():
+    """
+    %(prog)s - GALAGA Updater for ARCADE/Account infrastructure components.
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help="Arcade Name")
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path with filename in s3")
+
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            sys.exit(1)
+    arcade_name = args.arcade
+
+    session = common.setup_arcade_session(arcade_name)
+
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+
+    if args.path:
+        gsd_data = storage.s3_json_to_dict(session, bucket, f"{args.path}")
+        if not gsd_data:
+            sys.exit(1)
+        pprint(gsd_data)
+
+    print('Placeholder for galagazero-udate')
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,23 @@
+{
+    "user": "first.last",
+    "createTime": "2021/07/09/19/54",
+    "name": "kind_raw",
+    "version": 1,
+    "components": {
+        "eks": {
+            "location": "galaga/galaga/gsd/eks/latest/latest.json",
+            "overrides": {
+                "service_options/eks_version": "1.20"
+            }
+        },
+        "nodegroup": {
+            "location": "galaga/galaga/gsd/nodegroup/latest/latest.json",
+            "overrides": {}
+        },
+        "alb": {
+            "location": "galaga/galaga/gsd/alb/latest/latest.json",
+            "overrides": {}
+        }
+    }
+}
+

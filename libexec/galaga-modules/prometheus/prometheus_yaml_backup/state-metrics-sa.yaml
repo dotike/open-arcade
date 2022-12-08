@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    meta.helm.sh/release-name: promethus-for-arcade
+    meta.helm.sh/release-namespace: prometheus
+  creationTimestamp: "2022-07-22T15:22:55Z"
+  labels:
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/instance: promethus-for-arcade
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/version: 2.5.0
+    helm.sh/chart: kube-state-metrics-4.13.0
+  name: promethus-for-arcade-kube-state-metrics
+  namespace: prometheus
+  resourceVersion: "2281592"
+  uid: 53d32c47-6a6c-46b3-adf6-0dd29a578b6c
+secrets:
+- name: promethus-for-arcade-kube-state-metrics-token-jj6hl

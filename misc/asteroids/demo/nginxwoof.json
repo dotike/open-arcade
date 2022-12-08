@@ -1,0 +1,45 @@
+{
+   "service": "nginxwoof",
+   "description": "nginxwoof service",
+   "version": 4,
+   "component_type": "k8s",
+   "containers": [
+      {
+         "name": "woof",
+         "image": "nginx:1.14.2",
+         "readiness_check_path": "/",
+         "readiness_check_port": 80,
+         "cpu": 1,
+         "cpu_limit": 2,
+         "mem": 512,
+         "mem_limit": 1024,
+         "port_mappings": [
+            {
+              "port": 80,
+              "port_name": "http"
+            }
+         ]
+      }
+   ],
+   "service_options": {
+      "alerting": true,
+      "desired_count": 1,
+      "load_balanced": {
+          "public": true,
+          "private": true
+      }
+   },
+   "application_config": {
+      "custom_config": "woof",
+      "another_config": "aarf"
+   },
+   "tags": {
+      "some_tag": "test_value",
+      "another_tag": "test-value-two"
+   },
+   "metadata": {
+        "Service Name": "nginxwoof",
+        "Description": "A demo service to show how Arcade tooling works",
+        "Owner": "IP TOOLS"
+    }
+}

@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+# @depends: boto3, python (>=3.7)
+__version__ = '0.0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Lists s3 buckets for a given ARCADE."
+
+import argparse
+import os
+import sys
+import json
+
+from arclib import grv as grv
+from arclib import storage, log, common
+
+
+def format_and_output(in_dict: dict, args):
+    if args.jsonpretty:
+        print(json.dumps(in_dict, indent=4, sort_keys=True, default=str))
+    elif args.json:
+        print(json.dumps(in_dict, sort_keys=True, default=str))
+    else:
+        grv.prettyPrint(in_dict)
+    sys.exit(0)
+
+
+def main():
+    """
+    %(prog)s - Lists s3 buckets for a given ARCADE.
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__, prog='arcade bucketlist')
+    parser.add_argument("-b", "--bucketname", help="S3 Bucket Name.")
+    parser.add_argument("-A", "--arcade", help='Arcade Name.')
+    parser.add_argument("-j", "--json", action='store_true', help='JSON output.')
+    parser.add_argument("-J", "--jsonpretty", action='store_true', help='PrettyPrint JSON output.')
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+
+    # Validate that aws credentials are valid
+    common.validate_aws_creds()
+
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME', "")
+        if not args.arcade:
+            print("Arcade name missing, use --arcade or `export ARCADE_NAME=<name>", file=sys.stderr)
+            sys.exit(1)
+
+    if not args.bucketname and not args.arcade:
+        print("Either ARCADE name (-A) or bucket name (-b) is required")
+        sys.exit(1)
+    elif args.bucketname and args.arcade:
+        print("Either ARCADE name (-A) or bucket name (-b) is required")
+        sys.exit(1)
+
+    if args.arcade:
+        format_and_output(grv.get_arcade_buckets_detail(args.arcade), args)
+
+    if args.bucketname:
+        format_and_output(grv.get_single_bucket_detail(args.bucketname), args)
+
+
+if __name__ == '__main__':
+    main()

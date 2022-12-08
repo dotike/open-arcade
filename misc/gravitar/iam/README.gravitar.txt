@@ -1,0 +1,1 @@
+This directory contains an AWS IAM Role, formatted in JSON, which describes the IAM permission requirements in order to operate this tool.

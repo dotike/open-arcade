@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+import os, sys
+import re
+from arclib import common
+
+# --------------------------------------------------------------------
+#
+# main
+#
+# --------------------------------------------------------------------
+def main():
+    RS = common.ReturnStatus()
+    return_code = RS.OK
+    version_found = False
+    version_line = ''
+    
+    myhier = os.getenv('MYHIER')
+    if myhier is None:
+        git_home = os.getenv('GIT_HOME')
+        if git_home is None:
+            print("Error: MYHIER is not set")
+            return_code = RS.NOT_OK
+        else:
+            myhier = f"{git_home}/arcade"
+
+    version_file = f"{myhier}/etc/arcade_version"
+    if not os.path.exists(version_file):
+        print("ERROR: arcade_version NOT found")
+        return_code = RS.NOT_OK
+    else:
+        with open(version_file, 'r') as fh:
+            lines = fh.readlines()
+
+        for line in lines:
+            line = line.strip()
+            if len(line) <= 0:
+                continue
+
+            #'^[a-z0-9][._a-z0-9]*\.[a-z]+$'
+            name_regex_inspect = re.search('^[0-9][.0-9][.0-9]+$', line)
+            if name_regex_inspect is None:
+                version_found = False
+            else:
+                version_found = True
+                version_line = line
+                break
+            # End of if
+        # End of for loop
+    # End of else
+    if version_found:
+        print(f"Arcade version: {version_line}")
+        return_code = RS.OK
+    else:
+        print(f"Version line not found in {version_file}")
+        return_code = RS.OK
+        
+    sys.exit(return_code)
+    # End of main
+
+
+# --------------------------------------------------------------------
+#
+# Entry point
+#
+# --------------------------------------------------------------------
+if __name__ == '__main__':
+    main()
+    # End of entry point
+ 

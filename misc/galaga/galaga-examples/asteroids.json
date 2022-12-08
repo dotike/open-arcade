@@ -1,0 +1,12 @@
+{
+    "user": "andy.dunlap",
+    "createTime": "2022/05/02/07/32",
+    "name": "asteroids",
+    "version": 1,
+    "components": {
+        "asteroids-eks": {
+            "location": "gsd/asteroids-eks/default.json",
+            "overrides": {}
+        }
+    }
+}

@@ -1,0 +1,85 @@
+From 025d20181871469e7f41cf948e0efcff04394874 Mon Sep 17 00:00:00 2001
+From: Tyler Jones <tyler.jones@addepar.com>
+Date: Fri, 23 Sep 2022 11:26:55 -0500
+Subject: [PATCH] HTTPS LB LISTENER Placholder
+
+---
+ .../asteroids-eks/asteroids_eks.py            | 50 ++++++++++++++++---
+ 1 file changed, 42 insertions(+), 8 deletions(-)
+
+diff --git a/libexec/galaga-modules/asteroids-eks/asteroids_eks.py b/libexec/galaga-modules/asteroids-eks/asteroids_eks.py
+index 27a5344c..3a2d1ad5 100644
+--- a/libexec/galaga-modules/asteroids-eks/asteroids_eks.py
++++ b/libexec/galaga-modules/asteroids-eks/asteroids_eks.py
+@@ -223,26 +223,60 @@ def create_arcade_alb(arcade_name: str,
+     )
+ 
+     logging.info(modify_response)
++    
++    """HTTP Listner
++    """
++
++    # try:
++    #     elb_client.create_listener(
++    #         DefaultActions=[
++    #             {
++    #                 'Type': 'fixed-response',
++    #                 'FixedResponseConfig': {
++    #                     'StatusCode': '503',
++    #                     'ContentType': 'text/plain'
++    #                 },
++    #             },
++    #         ],
++    #         LoadBalancerArn=alb_arn,
++    #         Port=80,
++    #         Protocol='HTTP',
++    #     )
++    # except ClientError as c_e:
++    #     return c_e.response
++    
++    """Note About HTTPS Listner
++    Once domain information is figured out, we will need to provide a cert. Below will not work
++    and we will need to create code for creating LB certs for HTTPS Listners. I have a placholder function
++    in place for the certificate parameters. Note this is not a real function right now, it needs to be created.
++    """
++    cert_arn = get_lb_certificate()
+ 
++        
+     try:
+         elb_client.create_listener(
++            LoadBalancerArn=alb_arn,
++            Port=443,
++            Protocol='HTTPS',
+             DefaultActions=[
+                 {
+-                    'Type': 'fixed-response',
+-                    'FixedResponseConfig': {
+-                        'StatusCode': '503',
+-                        'ContentType': 'text/plain'
++                    "Type": "fixed-response",
++                    "FixedResponseConfig": {
++                        "StatusCode": "503",
++                        "ContentType": "text/plain"
+                     },
+                 },
+             ],
+-            LoadBalancerArn=alb_arn,
+-            Port=80,
+-            Protocol='HTTP',
++            Certificates=[
++                {
++                    "CertificateArn": cert_arn,
++                    "IsDefault": True
++                }
++            ],
+         )
+     except ClientError as c_e:
+         return c_e.response
+ 
+-
+     return status
+ 
+ 
+-- 
+2.37.1 (Apple Git-137.1)
+

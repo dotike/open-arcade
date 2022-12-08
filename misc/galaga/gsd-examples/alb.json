@@ -1,0 +1,9 @@
+{
+    "name": "alb",
+    "component_type": "alb",
+    "version": 1,
+    "description": "Module to create both internal and external ALBs",
+    "service_options": {
+        "public": false
+    }
+}

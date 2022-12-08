@@ -1,0 +1,203 @@
+# Source: sumologic/charts/fluent-bit/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: arcade-fluentd-fluent-bit
+  labels:
+    helm.sh/chart: fluent-bit-0.20.2
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/instance: arcade-fluentd
+    app.kubernetes.io/version: "1.9.4"
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: arcade-fluentd-fluent-bit
+subjects:
+  - kind: ServiceAccount
+    name: arcade-fluentd-fluent-bit
+    namespace: fluentd
+---
+
+# Source: sumologic/charts/kube-prometheus-stack/charts/kube-state-metrics/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-state-metrics
+    helm.sh/chart: kube-state-metrics-2.9.4
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: arcade-fluentd
+  name: arcade-fluentd-kube-state-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: arcade-fluentd-kube-state-metrics
+subjects:
+- kind: ServiceAccount
+  name: arcade-fluentd-kube-state-metrics
+  namespace: fluentd
+---
+# Source: sumologic/charts/kube-prometheus-stack/charts/kube-state-metrics/templates/psp-clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-state-metrics
+    helm.sh/chart: kube-state-metrics-2.9.4
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: arcade-fluentd
+  name: psp-arcade-fluentd-kube-state-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: psp-arcade-fluentd-kube-state-metrics
+subjects:
+  - kind: ServiceAccount
+    name: arcade-fluentd-kube-state-metrics
+    namespace: fluentd
+---
+# Source: sumologic/charts/kube-prometheus-stack/charts/prometheus-node-exporter/templates/psp-clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: psp-arcade-fluentd-prometheus-node-exporter
+  labels:     
+    app: prometheus-node-exporter
+    heritage: Helm
+    release: arcade-fluentd
+    chart: prometheus-node-exporter-1.12.0
+    jobLabel: node-exporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: psp-arcade-fluentd-prometheus-node-exporter
+subjects:
+  - kind: ServiceAccount
+    name: arcade-fluentd-prometheus-node-exporter
+    namespace: fluentd
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus-operator/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: arcade-fluentd-kube-promet-operator
+  labels:
+    app: kube-prometheus-stack-operator
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: arcade-fluentd-kube-promet-operator
+subjects:
+- kind: ServiceAccount
+  name: arcade-fluentd-kube-promet-operator
+  namespace: fluentd
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus-operator/psp-clusterrolebinding.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: arcade-fluentd-kube-promet-operator-psp
+  labels:
+    app: kube-prometheus-stack-operator
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: arcade-fluentd-kube-promet-operator-psp
+subjects:
+  - kind: ServiceAccount
+    name: arcade-fluentd-kube-promet-operator
+    namespace: fluentd
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: arcade-fluentd-kube-promet-prometheus
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: arcade-fluentd-kube-promet-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: arcade-fluentd-kube-promet-prometheus
+    namespace: fluentd
+---
+
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/psp-clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: arcade-fluentd-kube-promet-prometheus-psp
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: arcade-fluentd-kube-promet-prometheus-psp
+subjects:
+  - kind: ServiceAccount
+    name: arcade-fluentd-kube-promet-prometheus
+    namespace: fluentd
+---
+# Source: sumologic/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: arcade-fluentd-sumologic
+  labels:
+    app: arcade-fluentd-sumologic
+    chart: "sumologic-2.18.1"
+    release: "arcade-fluentd"
+    heritage: "Helm"
+subjects:
+- kind: ServiceAccount
+  namespace: fluentd
+  name: arcade-fluentd-sumologic
+roleRef:
+  kind: ClusterRole
+  name: arcade-fluentd-sumologic
+  apiGroup: rbac.authorization.k8s.io
+
+--- 
+
+# Source: sumologic/templates/setup/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name:  arcade-fluentd-sumologic-setup
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "2"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  labels:
+    app: arcade-fluentd-sumologic
+    chart: "sumologic-2.18.1"
+    release: "arcade-fluentd"
+    heritage: "Helm"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: arcade-fluentd-sumologic-setup
+subjects:
+  - kind: ServiceAccount
+    name: arcade-fluentd-sumologic-setup
+    namespace: fluentd

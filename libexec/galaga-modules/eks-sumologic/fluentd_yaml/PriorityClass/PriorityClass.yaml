@@ -1,0 +1,8 @@
+# Source: sumologic/templates/priorityclass.yaml
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: arcade-fluentd-sumologic-priorityclass
+value: 1000000
+globalDefault: false
+description: "This PriorityClass will be used for OTel Distro agents running as Daemonsets"

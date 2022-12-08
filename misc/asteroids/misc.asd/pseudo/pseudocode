@@ -1,0 +1,11 @@
+handle options/input
+get current date/time
+validate file
+hash file
+create path from date/time/hash
+upload file with date/time/hash
+output date/time/hash to stdout
+exit code 0
+
+output errors to stderr
+exit code 1

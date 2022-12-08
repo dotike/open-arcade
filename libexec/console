@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# I ♥  UTF8, 若田
+__version__='0.0.1'
+__author__='Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__="Returns the AWS console login URL for your account."
+
+
+shout() { echo "$0: $*" >&2; }
+die() { shout "$*"; exit 111; }
+try() { "$@" || die "cannot $*"; }
+
+usage() {
+  # print brief command line usage
+  fd="${fd:-2}" # stderr
+  ec="${ec:-5}" # Input/output error
+  try cat - 2>&$fd << EOF
+usage: arcade console
+       arcade console [-h]
+EOF
+}
+
+summary_usage() {
+  # accepts 1 user message as string
+  fd="${fd:-2}" # stderr
+  ec="${ec:-5}" # Input/output error
+  try cat - 2>&$fd << EOF
+`#usage`
+${__description__}
+
+This is a convienence program, which simply prints the login URL for the AWS Console associated with whatever configured API keys are configured for use with the ARCADE tools.
+
+For MacOS users, this can be used in conjunction with open(1) or other scripts, for example:
+
+  % open \`arcade console\`
+  # or, if your fingers are wired for subshell instead of subcommand,
+  % open \$(arcade console)
+
+See Also:
+  % arcade test aws -h
+
+EOF
+  [ -n "$1" ] && printf "\n${1}\n"
+  exit "$ec"
+}
+
+if [ "$@" ]; then
+  if [ "$1" == "-h" ]; then
+    ec=0 summary_usage
+  fi
+  usage
+else
+  try arcade test-aws -v | grep '^console:' | awk '{print $NF}'
+fi
+
+
+true

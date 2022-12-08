@@ -1,0 +1,177 @@
+apiVersion: v1
+items:
+  apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      prometheus.io/port: "9153"
+      prometheus.io/scrape: "true"
+    labels:
+      eks.amazonaws.com/component: kube-dns
+      k8s-app: kube-dns
+      kubernetes.io/cluster-service: "true"
+      kubernetes.io/name: CoreDNS
+    name: kube-dns
+    namespace: kube-system
+  spec:
+    clusterIP: 172.20.0.10
+    clusterIPs:
+    - 172.20.0.10
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: dns
+      port: 53
+      protocol: UDP
+      targetPort: 53
+    - name: dns-tcp
+      port: 53
+      protocol: TCP
+      targetPort: 53
+    selector:
+      k8s-app: kube-dns
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: promethus-for-arcade
+      meta.helm.sh/release-namespace: prometheus
+      prometheus.io/scrape: "true"
+    labels:
+      app.kubernetes.io/component: metrics
+      app.kubernetes.io/instance: promethus-for-arcade
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: kube-state-metrics
+      app.kubernetes.io/part-of: kube-state-metrics
+      app.kubernetes.io/version: 2.5.0
+      helm.sh/chart: kube-state-metrics-4.13.0
+    name: promethus-for-arcade-kube-state-metrics
+    namespace: prometheus
+  spec:
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app.kubernetes.io/instance: promethus-for-arcade
+      app.kubernetes.io/name: kube-state-metrics
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: promethus-for-arcade
+      meta.helm.sh/release-namespace: prometheus
+      prometheus.io/scrape: "true"
+    labels:
+      app: prometheus
+      app.kubernetes.io/managed-by: Helm
+      chart: prometheus-15.10.5
+      component: node-exporter
+      heritage: Helm
+      release: promethus-for-arcade
+    name: promethus-for-arcade-node-exporter
+    namespace: prometheus
+  spec:
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: metrics
+      port: 9100
+      protocol: TCP
+      targetPort: 9100
+    selector:
+      app: prometheus
+      component: node-exporter
+      release: promethus-for-arcade
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: promethus-for-arcade
+      meta.helm.sh/release-namespace: prometheus
+    labels:
+      app: prometheus
+      app.kubernetes.io/managed-by: Helm
+      chart: prometheus-15.10.5
+      component: server
+      heritage: Helm
+      release: promethus-for-arcade
+    name: promethus-for-arcade-server
+    namespace: prometheus
+  spec:
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prometheus
+      component: server
+      release: promethus-for-arcade
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: promethus-for-arcade
+      meta.helm.sh/release-namespace: prometheus
+    creationTimestamp: "2022-07-21T19:59:28Z"
+    labels:
+      app: prometheus
+      app.kubernetes.io/managed-by: Helm
+      chart: prometheus-15.10.5
+      component: server
+      heritage: Helm
+      release: promethus-for-arcade
+    name: promethus-for-arcade-server-headless
+    namespace: prometheus
+    resourceVersion: "2044377"
+    uid: 3e9d4fee-875a-443d-8a38-4a4e966a9fa3
+  spec:
+    clusterIP: None
+    clusterIPs:
+    - None
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prometheus
+      component: server
+      release: promethus-for-arcade
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+kind: List
+metadata:
+  resourceVersion: ""
+  selfLink: ""

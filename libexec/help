@@ -1,0 +1,151 @@
+#!/bin/sh
+
+# I ♥  UTF8, 若田
+
+yell() { echo "$0: $*" >&2; }
+die() { yell "$*"; exit 111; }
+try() { "$@" || die "cannot $*"; }
+
+debug() { fd="${fd:-2}";[ -n "$DEBUG" ] && try echo "$*" >&${fd}; }
+
+__description__="Basic info about the ARCADE tools."
+
+
+doc_block() {
+fd="${fd:-2}" # stderr
+ec="${ec:-5}" # Input/output error
+
+command_list="`list_commands_descriptions`"
+try cat - 2>&$fd << EOF
+
+arcade - tool suite version ${VERSION}
+
+WHAT THIS IS:
+  ARCADE is a system for provisioning, managing and destroying
+  complete instances of base AWS infrastructure.
+
+
+HOW TO USE IT:
+  If you haven't already, try issuing 'arcade' without additional
+  subcommands or flags for a list of commands.
+  (You are probably reading this by running 'arcade help'.)
+  'arcade' is a combinator style tool, much like the popular git(1)
+  source control tools.
+
+  Each command should have it's own help, for more info, try to run:
+
+    'arcade [command] -h'
+
+
+AVAILABLE COMMANDS:
+
+${command_list}
+
+
+ENV:
+    The top-level 'arcade' tool sets and passes ENV to all subcommand
+    programs, yet, optargs passed to subcommands are the final word
+    on the actual variable data used.
+
+    The 'arcade' tool acts on the following ENV variables:
+
+    DEBUG
+      Performs many extra checks and sends warnings and erros to stdout.
+
+    VERBOSE
+      Terse explanation of signifigant steps to stderr, suitable to
+      pipe to logger(8) syslog(1), or interactive wrapper programs.
+
+    ATMP
+      ARCADE specific tmp files location, (must be writable by user).
+      Default location is "\$HOME/tmp/arcade", and arcade tooling
+      will created it when arcade is run, if the ATMP directory
+      does not exist.
+
+    MYHIER
+      ARCADE toolkit location, which may also set other important ENV
+      vars, including PYTHONPATH.  Feeding the 'arcade' master program
+      this ENV var will override the program default, which is the
+      parent hier where the 'arcade' program resides in the filesystem.
+
+    PYTHONPATH
+      The 'arcade' program can be fed an alternate PYTHONPATH, default
+      PYTHONPATH set by 'arcade' is the library path in the same
+      parent hier where the 'arcade' program resides in the filesystem.
+
+
+EXTENDING 'arcade':
+  All arcade commands are  merely executable programs in libexec.
+
+  Top level commands should contain no spaces in their name, for example:
+
+    The programs 'libexec/foo' or 'libexec/bar.py' would become
+    subcommands 'arcade foo' or 'arcade bar', respectively.
+
+  Second level commands are more common, typically related to ARCADE
+  layers and subsystems.  These programs simply require one '-' character
+  in their name, for example:
+
+    The programs 'libexec/foo-create' and 'libexec/foo-destroy.py', would
+    become subcommands 'arcade foo create' and 'arcade foo destroy'.
+
+  These programs can be written in any language, but python and shell are
+  the only supported languages suitable for use as core arcade tooling.
+  Additionally, while any program can be run, it should play nice with
+  standard UNIX principles- stdin, stdout, stderr - and exit codes- are all
+  used and respected.
+
+  If you provide a description variable to your program, in the form of:
+  '^__description__="My string."' - then your description will appear in the
+  list above.  Your program is responsible for its own help options- '-h'
+  is recommended for consistency across arcade tooling.
+  Finally, the lib/ directory includes commonly used routines for shell and
+  python, and it's well worth using those libraries.
+
+
+AUTHORS
+  The Addepar Infrastructure Platform Team
+
+EOF
+[ -n "$1" ] && printf "\n${1}\n"
+exit "$ec"
+}
+
+list_commands_descriptions() {
+  for i in `find ${myhier}/libexec -type f -depth 1 | grep "${1}" | sort` ; do
+    debug "# fetching available command info: ${i}"
+    _name_before_dot="`basename ${i} | cut -d "." -f1`"
+    debug "# _name_before_dot='${_name_before_dot}'"
+
+    if [ ! "${_name_before_dot}" ] ; then
+      true
+    else
+      _prog="`basename ${i} | cut -d"." -f1 | sed -e 's/\-/ /' -e 's/^/arcade /'`"
+      debug "# _prog='${_prog}'"
+      debug "# searching for '^__description__=' or '^__description__ ='"
+      _desc="`grep -e '^__description__=' -e '^__description__ =' ${i} | head -n 1 | sed 's/^__description__=//;s/[ \t]*$//;s/^__description__ = .//;s/[ \t]*$//' | sed 's/^[\"]*//;s/[\"]*$//'`"
+      echo "  ${_prog}"
+      echo "${_desc:-No 'description' given.}" | fold -sw 70 | pr -t -o 10
+      echo
+    fi
+  done
+}
+
+
+## vars
+
+# note: '__description__=' is set near the top of this program
+  debug "# __description__=${__description__}"
+_me_cmd="`echo ${0##*/} | try cut -d '-' -f 2-5`"
+  debug "# _me_cmd=${_me_cmd}"
+dothere=$(cd "${0%/*}" 2>/dev/null; echo "`pwd -L`")
+  debug "# dothere=$dothere"
+myhier="${dothere%/*}"
+  debug "# myhier=$myhier"
+
+
+## action
+
+doc_block
+
+exit 0

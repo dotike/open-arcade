@@ -1,0 +1,76 @@
+#!/bin/sh
+# -*- mode: shell -*-
+# -*- coding: utf-8 -*-
+
+
+__version__="0.1"
+__author__="Addepar Infrastructure Platform Tools Team <iptools@addepar.com>"
+__description__="Configure EKS for a given arcade."
+
+
+if [ "$1" == "-h" ]; then
+  echo "Usage: arcade config kubectl [-h] -A ARCADE" >&2
+  echo ""
+  echo "Setup kubectl context based on ARCADE information. This modifies ~/.kube/config, adding context if context doesn't exist."
+  echo ""
+  echo "optional arguments:"
+  echo "    -h      show the help message and exit"
+  echo ""
+  echo "required arguments:"
+  echo "   -A ARCADE    Logical name of the arcade"
+  echo ""
+  echo "Example:"
+  echo "    arcade config kubectl example.arc"
+  exit 1
+fi
+
+if [ -z "${ARCADE_NAME}" ]; then
+  arcade_name=$2
+else
+  arcade_name="${ARCADE_NAME}"
+fi
+
+
+AWS_DEFAULT_REGION='us-west-2'
+
+infra_bucket_name="infrastructure.${arcade_name/_/}"
+infra_bucket=$(aws s3 ls | grep ${infra_bucket_name} | cut -d" " -f3)
+if [ -z ${infra_bucket} ]; then
+  echo "aws s3 ls failed.  Check AWS config, i.e. default region."
+  exit 1
+fi
+arcade_region=$(aws s3api get-bucket-location --bucket ${infra_bucket} | grep Location | cut -d'"' -f4)
+if [ -z ${arcade_region} ]; then
+  echo "Getting bucket region failed.  Check AWS config, i.e. default region."
+  exit 1
+fi
+
+AWS_DEFAULT_REGION=${arcade_region}
+
+cluster_name="asteroids-${arcade_name/./-}"
+
+aws eks describe-cluster --name ${cluster_name} >/dev/null 2>&1
+rccluster=$?
+if [ ${rccluster} -ne 0 ]; then
+  exit
+fi
+
+aws iam get-role --role-name EKSAdminRole >/dev/null 2>&1
+rcprof=$?
+if [ ${rcprof} -eq 0 ]; then
+  kubectl config use-context ${cluster_name} >/dev/null 2>&1
+  use_rc=$?
+  kubectl get nodes -A >/dev/null 2>&1
+  rc=$?
+  if [ ${rc} -ne 0 ] || [ ${use_rc} -ne 0 ]; then
+    eksadminrole_arn=$(aws iam get-role --role-name EKSAdminRole | grep Arn | cut -d'"' -f4)
+    aws eks update-kubeconfig --alias ${cluster_name} \
+      --name ${cluster_name} \
+      --region ${arcade_region} \
+      --role-arn ${eksadminrole_arn} >/dev/null
+  fi
+  echo "current-context:"
+  kubectl config current-context
+else
+  echo "IAM profile EKSAdminRole has not been setup.  Check with your AWS admin."
+fi

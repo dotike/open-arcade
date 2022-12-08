@@ -1,0 +1,31 @@
+{
+  "name": "asteroids-eks",
+  "component_type": "asteroids-eks",
+  "version": 1,
+  "description": "Data for the ASTEROIDS EKS GALAGA with updated version",
+  "services": {
+    "alb": {
+      "service_options": {
+        "attributes": {
+          "routing.http.desync_mitigation_mode": "strictest"
+        }
+      }
+    },
+    "eks": {
+      "service_options": {
+        "cluster_prefix": "asteroids",
+        "eks_version": "1.20"
+      }
+    },
+    "nodegroup": {
+      "service_options": {
+        "asteroids": {
+          "nodes": 4,
+          "max_nodes": 4,
+          "instance_type": "r5.xlarge",
+          "size": 20
+        }
+      }
+    }
+  }
+}

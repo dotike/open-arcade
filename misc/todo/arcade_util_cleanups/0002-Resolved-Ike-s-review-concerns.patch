@@ -1,0 +1,78 @@
+From 67c5a8300acc065117c21313797566ad252002da Mon Sep 17 00:00:00 2001
+From: Terry V Bush <99690003+tvbush@users.noreply.github.com>
+Date: Fri, 4 Nov 2022 17:51:40 -0700
+Subject: [PATCH 2/2] Resolved Ike's review concerns.
+
+o Added more info about what find_prog() returns with a better example.
+o Found a non-extended RE for the "grep -v". This has been very carefully tested!
+o Reverted the "us-east-2" back to "us-east-1".
+---
+ bin/arcade | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/bin/arcade b/bin/arcade
+index e7709bf1..6516561f 100755
+--- a/bin/arcade
++++ b/bin/arcade
+@@ -69,10 +69,14 @@ find_prog() {
+   #   Name of the program to find.
+   #   Command var for no extension.
+   #   Command var for with extension.
++  # returns:
++  #   A string suitable for an eval.
++  #   If eval'd, it will set $2 to the subprog found and $3 to the subprog with extension found.
+   # Example:
+-  #   eval `find_prog asteroid-cat _subcombo _subcombo_ex`
++  #   Call as: eval `find_prog asteroid-cat _subcombo _subcombo_ex`
++  #   Returns: _subcombo=/arcade/libexec/asteroid-cat; _subcombo_ex=/arcade/libexec/asteroid-cat.py
+   _a_prg_cnt=0
+-  debug "# Check for simple command."
++  # Check for simple command.
+   _subprg="${MYHIER}/libexec/${1}"
+   _subprg_exist=''
+   [ -e "${_subprg}" ] && _subprg_exist="${_subprg}"
+@@ -85,12 +89,13 @@ find_prog() {
+   [ -n "${_subprg_exist}" ] && _subprg_exli="${_subprg_exist} ${_subprg_exli}"
+   if [ -n "${_subprg_exli}" ]; then
+     debug "# Found Subprgs with extensions: (${_subprg_exli})"
+-    debug "# Check each sub simple command found."
++    # Check each sub simple command found.
+     for _subprg_item in ${_subprg_exli}; do
+-      if [ -z `echo ${_subprg_item} | grep -Ev '~$'` ]; then
++      if [ -z `echo ${_subprg_item} | grep -v '~$'` ]; then
+         # Ignore files ending with a tilda ('~'). They are emacs backup files.
+         continue
+       fi
++      # Check for multiple results in _subprg_exli. This is not allowed.
+       _a_prg_cnt=$((_a_prg_cnt + 1))
+       [ ${_a_prg_cnt} -gt 1 ] && die "# Multiple prgrams found. Bailing: ${_subprg_exli}"
+       _subprg_ex="${_subprg_item}"
+@@ -168,14 +173,14 @@ list_raw_libexec() {
+ }
+ 
+ list_commands() {
+-  for i in `list_raw_libexec | cut -d"-" -f1 | grep -Ev '^\.|~$' | sort -u` ; do
++  for i in `list_raw_libexec | cut -d"-" -f1 | grep -v '^\.\|~$' | sort -u` ; do
+     _command="`basename ${i}`"
+     echo "  ${_command}"
+   done
+ }
+ 
+ list_subcommands() {
+-  for i in `list_raw_libexec | grep "${1}" | grep -Ev '^\.|~$' | sort` ; do
++  for i in `list_raw_libexec | grep "${1}" | grep -v '^\.\|~$' | sort` ; do
+     _prog="`basename ${i} | cut -d"." -f1 | sed -e 's/\-/ /' -e 's/^/arcade /'`"
+     echo "  ${_prog}"
+   done
+@@ -293,7 +298,7 @@ try mkdir -p -m 0700 ${ATMP}
+ 
+ # AWS API calls requrie a region to be set, even if the API call is
+ # to inquire about regions, (e.g describe_regions()), so, hardcode:
+-aws_requires_region='us-east-2'
++aws_requires_region='us-east-1'
+ debug "# aws_requires_region=${aws_requires_region}"
+ #
+ # We may have our region set by config we've sourced,
+-- 
+2.37.1 (Apple Git-137.1)
+

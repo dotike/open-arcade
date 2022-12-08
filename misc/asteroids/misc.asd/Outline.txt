@@ -1,0 +1,20 @@
+asteroid-create:
+        -n name: new name of asteroid
+        -v version: optional version of the asteroid, default value: latest
+        -s asd1 -s asd2: multiple asd services
+        -o output: a json config file
+        --upload ??: look asd implementation.
+        --override ??: multiple options to override
+
+asteroid-list: list all the asteroids matching the name
+        -n name: the name of asteroid
+
+asteroid-cat: display detail information about asteroid
+        -n name: the name of asteroid
+
+asteroid-deploy: deploy the services based on asteroid configuration
+        -n name: the name of asteroid
+        -a name: the arcade name
+
+asteroid-delete: delete an asteroid configuration
+        -n name: the name of asteroid

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    meta.helm.sh/release-name: promethus-for-arcade
+    meta.helm.sh/release-namespace: prometheus
+  creationTimestamp: "2022-07-22T15:22:55Z"
+  labels:
+    app: prometheus
+    app.kubernetes.io/managed-by: Helm
+    chart: prometheus-15.10.5
+    component: node-exporter
+    heritage: Helm
+    release: promethus-for-arcade
+  name: promethus-for-arcade-node-exporter
+  namespace: prometheus
+  resourceVersion: "2281594"
+  uid: 4fd36022-9dde-466b-b09c-fb471beece5b
+secrets:
+- name: promethus-for-arcade-node-exporter-token-d4rp5

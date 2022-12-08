@@ -1,0 +1,12 @@
+{
+    "name": "galagazero",
+    "component_type": "galagazero",
+    "version": 1,
+    "description": "Basic bootstrap for basic aws services (SuperServices)",
+    "service_options": {
+        "super_service_account": "023960176222",
+        "super_service_role_name": "Read_Secret_Role_Super_Service",
+        "super_service_prefix": "superservice/*"
+        
+    }
+}

@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+eks-fluentd-create -- GALAGA create fluentd componet
+'''
+
+# @depends: python (>=3.9)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Create the ASTEROIDS infrastructure."
+
+import argparse
+import logging
+import os
+from pprint import pprint
+import sys
+import yaml
+import boto3
+
+from arclib import common, log, storage, k8s, common, ecr
+from kubernetes.client.rest import ApiException
+from kubernetes import client
+from botocore.exceptions import ClientError
+
+
+def get_asteroids_fluentd_daemonset_info(arcade_name: str, cluster_prefix: str) -> dict:
+    """
+    Get DaemonSet info for fluentd node logging to log-relay.
+
+    Args:
+        arcade_name: arcade_name name
+        cluster_prefix: the prefix of log-relay cluster
+
+    Returns:
+        bool
+    """
+    if not cluster_prefix or not arcade_name:
+        return {}
+
+    arcade_domain = arcade_name.replace('_', '-')
+    arcade_safe_name = arcade_name.replace('_', '').replace('.', '-')
+    asg_name = f"{cluster_prefix}.{arcade_domain}"
+    daemonset_name = f"node-collector-{arcade_safe_name}"
+    fluentd_syslog_uri = ecr.get_container_uri('arcade/fluentd-kubernetes-syslog')
+    if not fluentd_syslog_uri:
+        logging.error('No arcade/fluentd-kubernetes-syslog container in ECR')
+        return False
+
+    try:
+        k8s.load_arcade_k8s_config(arcade_name)
+    except ClientError:
+        return {}
+    apps_v1 = client.AppsV1Api()
+
+    daemonset_yaml = f"""
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {daemonset_name}
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
+    version: v1
+spec:
+  selector:
+    matchLabels:
+      k8s-app: fluentd-logging
+  template:
+    metadata:
+      labels:
+        k8s-app: fluentd-logging
+        version: v1
+    spec:
+      serviceAccount: fluentd
+      serviceAccountName: fluentd
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      containers:
+      - name: {daemonset_name}
+        image: {fluentd_syslog_uri}
+        env:
+          - name:  SYSLOG_HOST
+            value: '{asg_name}'
+          - name:  SYSLOG_PORT
+            value: '514'
+          - name:  SYSLOG_PROTOCOL
+            value: 'udp'
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: dockercontainerlogdirectory
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: dockerpodlogdirectory
+          mountPath: /var/log/pods
+          readOnly: true
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: dockercontainerlogdirectory
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: dockerpodlogdirectory
+        hostPath:
+          path: /var/log/pods
+"""
+    daemon_set = yaml.safe_load(daemonset_yaml)
+
+    try:
+        response = apps_v1.read_namespaced_daemon_set(
+            name=daemon_set['metadata']['name'],
+            namespace=daemon_set['metadata']['namespace'],
+        )
+    except ApiException as api_error:
+        if api_error.status == 404:
+            response = {}
+
+    return response
+
+
+def main():
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path with filename in s3", required=True)
+    
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            sys.exit(1)
+    
+    arcade_name = args.arcade
+    os.environ["AWS_DEFAULT_REGION"] = common.get_arcade_region(arcade_name)
+
+    tmp_dir = os.getenv("ATMP", '/tmp')
+
+    session = boto3.session.Session()
+
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    
+    if not gsd_data:
+        sys.exit(1)
+    
+    pprint(gsd_data)
+    
+    cluster_prefix = 'asteroids'
+    
+    if not get_asteroids_fluentd_daemonset_info(arcade_name, cluster_prefix):
+        logging.info("Log relay Asteroids node collector does not exist.")
+        sys.exit(1)
+        
+    sys.exit(0)
+
+if __name__ == '__main__':
+    main()

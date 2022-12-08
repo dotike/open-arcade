@@ -1,0 +1,193 @@
+{
+    "profiles": [
+        {
+            "name": "coneyisland",
+            "default": "yes",
+            "owner_id": "023960176222"
+        },
+        {
+            "name": "arcadeowner",
+            "default": "no",
+            "owner_id": "541420744399"
+        }
+    ],
+    "tags": {
+        "auto_scale_groups": "no",
+        "target_groups": "no",
+        "ec2_instance": "no",
+        "eks_cluster": "no",
+        "eks_nodegroup": "no",
+        "eks_nodegroup_arn": "no",
+        "eips": "no",
+        "gravitar_manifest": "no",
+        "healthcheck": "no",
+        "hosted_zone": "no",
+        "hosted_zone_records": "no",
+        "internet_gateways": "no",
+        "key_pair": "no",
+        "load_balancer": "no",
+        "msk": "no",
+        "nat_gateways":"no",
+        "network_acl": "no",
+        "network_interfaces":"no",
+        "parameters": "no",
+        "rds_instance": "no",
+        "route_tables": "no",
+        "s3_buckets": "no",
+        "secrets": "no",
+        "security_groups": "no",
+        "lambda_functions": "no",
+        "vpc": "no",
+        "vpc_end_points": "no",
+        "vpc_subnets": "no"
+    },
+    "resources": [
+        {
+            "stack": [
+                {
+                    "layer": "gravitar",
+                    "turned_off": [
+                        "get_auto_scale_group_info",
+                        "get_iam_roles_info",
+                        "get_load_balancer_info",
+                        "get_target_group_info"
+                    ],
+                    "default": [
+                        "get_eip_info",
+                        "get_grv_manifest",
+                        "get_s3_info",
+                        "get_vpc_info",
+                        "get_nat_gateway_info"
+                    ],
+                    "inclusive": [
+                        "get_ec2_instances_info",
+                        "get_hosted_zone_info",
+                        "get_healthcheck_info",
+                        "get_internet_gateway_info",
+                        "get_key_pairs_info",
+                        "get_network_acl_info",
+                        "get_network_interface_info",
+                        "get_route_table_info",
+                        "get_s3_bucket_list",
+                        "get_secrets_info",
+                        "get_security_group_info",
+                        "get_subnet_info",
+                        "get_vpc_end_points_info",
+                        "get_lambda_function_info"
+
+                    ]
+                },
+                {
+                    "layer": "galaga",
+                    "turned_off": [
+                        "get_iam_roles_info"
+                    ],
+                    "default": [
+                        "get_auto_scale_group_info",
+                        "get_ec2_instances_info",
+                        "get_eks_info",
+                        "get_eks_nodegroup_info",
+                        "get_eip_info",
+                        "get_grv_manifest",
+                        "get_hosted_zone_info",
+                        "get_healthcheck_info",
+                        "get_internet_gateway_info",
+                        "get_key_pairs_info",
+                        "get_load_balancer_info",
+                        "get_msk_info",
+                        "get_nat_gateway_info",
+                        "get_network_acl_info",
+                        "get_network_interface_info",
+                        "get_parameter_info",
+                        "get_route_table_info",
+                        "get_s3_bucket_list",
+                        "get_s3_info",
+                        "get_secrets_info",
+                        "get_security_group_info",
+                        "get_subnet_info",
+                        "get_target_group_info",
+                        "get_vpc_end_points_info",
+                        "get_vpc_info",
+                        "get_lambda_function_info"
+
+                    ],
+                    "inclusive": []
+                },
+                {
+                    "layer": "asteroid",
+                    "turned_off": [
+                        "get_iam_roles_info"
+                    ],
+                    "default": [
+                        "get_auto_scale_group_info",
+                        "get_ec2_instances_info",
+                        "get_eks_info",
+                        "get_eks_nodegroup_info",
+                        "get_eip_info",
+                        "get_grv_manifest",
+                        "get_hosted_zone_info",
+                        "get_healthcheck_info",
+                        "get_internet_gateway_info",
+                        "get_key_pairs_info",
+                        "get_load_balancer_info",
+                        "get_target_group_info",
+                        "get_msk_info",
+                        "get_network_acl_info",
+                        "get_network_interface_info",
+                        "get_nat_gateway_info",
+                        "get_parameter_info",
+                        "get_rds_instance_info",
+                        "get_route_table_info",
+                        "get_s3_bucket_list",
+                        "get_s3_info",
+                        "get_secrets_info",
+                        "get_security_group_info",
+                        "get_subnet_info",
+                        "get_target_group_info",
+                        "get_vpc_end_points_info",
+                        "get_vpc_info",
+                        "get_lambda_function_info"
+
+                    ],
+                    "inclusive": []
+                },
+                {
+                    "layer": "arcade",
+                    "turned_off": [
+                        "get_iam_roles_info"
+                    ],
+                    "default": [
+                        "get_auto_scale_group_info",
+                        "get_ec2_instances_info",
+                        "get_eks_info",
+                        "get_eks_nodegroup_info",
+                        "get_eip_info",
+                        "get_grv_manifest",
+                        "get_hosted_zone_info",
+                        "get_healthcheck_info",
+                        "get_internet_gateway_info",
+                        "get_key_pairs_info",
+                        "get_load_balancer_info",
+                        "get_msk_info",
+                        "get_nat_gateway_info",
+                        "get_network_acl_info",
+                        "get_network_interface_info",
+                        "get_parameter_info",
+                        "get_route_table_info",
+                        "get_rds_instance_info",
+                        "get_s3_bucket_list",
+                        "get_s3_info",
+                        "get_secrets_info",
+                        "get_security_group_info",
+                        "get_subnet_info",
+                        "get_target_group_info",
+                        "get_vpc_end_points_info",
+                        "get_vpc_info",
+                        "get_lambda_function_info"
+                    ],
+                    "inclusive": []
+                }
+            ]
+        }
+    ]
+}

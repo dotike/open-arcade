@@ -1,0 +1,45 @@
+{
+   "service": "frontendaarf",
+   "description": "fronted service",
+   "version": 1,
+   "component_type": "k8s",
+   "containers": [
+      {
+         "name": "frontendaarf",
+         "image": "nginx:latest",
+         "readiness_check_path": "/index.html",
+         "readiness_check_port": 5000,
+         "cpu": 1,
+         "cpu_limit": 2,
+         "mem": 512,
+         "mem_limit": 1024,
+         "port_mappings": [
+            {
+              "port": 5000,
+              "port_name": "http"
+            }
+         ]
+      }
+   ],
+   "service_options": {
+      "alerting": true,
+      "desired_count": 1,
+      "load_balanced": {
+          "public": true,
+          "private": true
+      }
+   },
+   "application_config": {
+      "config_val_1": "foo",
+      "config_val_2": "bar"
+   },
+   "tags": {
+      "test_key": "test_value",
+      "test_key2": "test_value_two"
+   },
+   "metadata": {
+        "Service Name": "frontendaarf",
+        "Description": "A demo service to show how Arcade tooling works",
+        "Owner": "IP TOOLS"
+   }
+}

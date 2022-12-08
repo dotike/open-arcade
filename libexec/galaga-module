@@ -1,0 +1,256 @@
+#!/bin/sh
+
+# A time-worn combinator pattern program.
+# Reliably calls sub-programs with correct semantics as though
+# the sub-programs were being called on their own.
+# I ♥  UTF8, 若田
+
+shout() { echo "$0: $*" >&2; }
+die() { shout "$*"; exit 111; }
+try() { "$@" || die "cannot $*"; }
+
+debug() { fd="${fd:-2}";[ -n "$DEBUG" ] && try echo "$*" >&${fd}; }
+chirp() { echo "$*" >&2; }
+
+usage() {
+  # print brief command line usage
+  fd="${fd:-2}" # stderr
+  ec="${ec:-5}" # Input/output error
+  try cat - 2>&$fd << EOF
+usage: arcade ${self##*/} command subcommand [args]
+       arcade ${self##*/} [-v|d|D] [-V]  [-h|c]
+EOF
+}
+
+summary_usage() {
+  # accepts 1 user message as string
+  fd="${fd:-2}" # stderr
+  ec="${ec:-5}" # Input/output error
+  try cat - 2>&$fd << EOF
+`#usage`
+Common arcade ${self##*/} commands:
+
+Try 'arcade ${self##*/} -c' for a full list of commands.
+Try '-h' with any command, for more info about that specific command.
+See 'arcade ${self##*/} help' for an overview of the system.
+EOF
+  [ -n "$1" ] && printf "\n${1}\n"
+  exit "$ec"
+}
+
+callsubprog() {
+  # expects to pass $@ from calling program,
+  # Calls the subcombinator program,
+  # Compares $1 and $2 (named sub-command possibilities) to actual libexec.
+  # If 'foo' and 'foo-bar' both exist, the first order name is the program
+  # used, (e.g. 'foo' wins).  Symlinks are supported.
+  debug "# combinator args: '${1}' '${2}'"
+
+  # currently only one level of combinator inderection allowed,
+
+  debug "# Attempting to determine which program to run."
+  _a_prog_cnt=0
+##  debug "# Check for simple command."
+##  _subprog="${MYHIER}/libexec/galaga-modules/${1}/${1}-${2}"
+##  _subprog_exist=''
+##  [ -e "${_subprog}" ] && _subprog_exist="${_subprog}"
+##  # Match any sub commands with an extension.
+##  _subprog_exli=$(echo ${_subprog}.*)
+##  if [ "$_subprog_exli" = "${_subprog}.*" ]; then
+##    debug "# No matching subprog. Ignoring: ${_subprog_exli}"
+##    _subprog_exli=''
+##  fi
+##  [ -n "${_subprog_exist}" ] && _subprog_exli="${_subprog_exist} ${_subprog_exli}"
+##  if [ -n "${_subprog_exli}" ]; then
+##    debug "# Found Subprogs with extensions: (${_subprog_exli})"
+##    debug "# Check each sub simple command found."
+##    for _subprog_item in ${_subprog_exli}; do
+##      _a_prog_cnt=$((_a_prog_cnt + 1))
+##      [ ${_a_prog_cnt} -gt 1 ] && die "# Multiple programs found. Bailing: ${_subprog_exli}"
+##      _subprog_ex="${_subprog_item}"
+##      debug "#  _subprog_ex = '${_subprog_ex}'"
+##    done
+##  fi
+
+  _a_combo_cnt=0
+  debug "# Check for combo command."
+  _subcombo="${MYHIER}/libexec/galaga-modules/${1}/${1}-${2}"
+  _subcombo_exist=''
+  [ -e "${_subcombo}" ] && _subcombo_exist="${_subcombo}"
+  # Match any sub commands with an extension.
+  _subcombo_exli=$(echo ${_subcombo}.*)
+  if [ "$_subcombo_exli" = "${_subcombo}.*" ]; then
+    debug "# No matching subcombo. Ignoring: ${_subcombo_exli}"
+    _subcombo_exli=''
+  fi
+  [ -n "${_subcombo_exist}" ] && _subcombo_exli="${_subcombo_exist} ${_subcombo_exli}"
+  if [ -n "${_subcombo_exli}" ]; then
+    debug "# Found Subcombos with extensions: (${_subcombo_exli})"
+    debug "# Check each sub combo command found."
+    for _subcombo_item in ${_subcombo_exli}; do
+      _a_combo_cnt=$((_a_combo_cnt + 1))
+      [ ${_a_combo_cnt} -gt 1 ] && die "# Multiple programs found. Bailing: ${_subcombo_exli}"
+      _subcombo_ex="${_subcombo_item}"
+      debug "#  _subcombo_ex = '${_subcombo_ex}'"
+    done
+  fi
+
+  # now lets confirm one of these,
+  if [ -e "${_subprog}" -o -h "${_subprog}" ] ; then
+    subprog="${_subprog}"
+    shift
+    debug "# found first order named program: ${subprog}"
+  elif [ -e "${_subprog_ex}" -o -h "${_subprog_ex}" ] ; then
+    subprog="${_subprog_ex}"
+    shift
+    debug "# found first order named program with file addendum: ${subprog}"
+  elif [ -e "${_subcombo}" -o -h "${_subcombo}" ] ; then
+    subprog="${_subcombo}"
+    shift
+    shift
+    debug "# found second order named program: ${subprog}"
+  elif [ -e "${_subcombo_ex}" -o -h "${_subcombo_ex}"  ] ; then
+    subprog="${_subcombo_ex}"
+    shift
+    shift
+    debug "# found second order named program with file addendum: ${subprog}"
+  else
+    list="`list_subcommands ${1}`"
+    if [ -n "${list}" ]; then
+      usage
+      echo "Available subcommands"
+      list_subcommands "${1}"
+    else
+      echo "${self##*/}: '${1}' is not an ${self##*/} command.  See '${self##*/} -h'." 1>&2
+      # usage
+    fi
+    exit 1
+  fi
+  debug "# sub-program path: ${subprog}"
+  debug "# ${subprog} ${@}"
+
+  # The actual action,
+  ${subprog} "${@}"
+  subexit="${?:-0}"
+  exit "$subexit"
+
+}
+
+list_raw_galagamodules() {
+# find first level files and symlinks
+# returns unsorted list
+  try find ${MYHIER}/libexec/galaga-modules -type d -depth 1
+}
+
+list_commands() {
+  for i in `list_raw_galagamodules | cut -d"-" -f1 | grep -v '^\.' | sort -u` ; do
+    _command="`basename ${i}`"
+    echo "  ${_command}"
+  done
+}
+
+list_subcommands() {
+  for i in `list_raw_galagamodules | grep "${1}" | grep -v '^\.' | grep -v galagazero | sort` ; do
+    #_prog="`basename ${i} | cut -d"." -f1 | sed -e 's/\-/ /' -e 's/^/arcade galaga module /'`"
+    _prog="`basename ${i} | cut -d"." -f1 | sed -e 's/^/arcade galaga module /'`"
+    for j in create read update destroy; do
+      echo "  ${_prog} ${j}"
+    done
+  done
+}
+
+octalperms() {
+  # given a file path, returns octal file string
+  if [ -e "${1}" ] ; then
+    try stat -r ${1} | awk '{print $3}' | sed 's/^.*\(.\{4\}\)$/\1/'
+  fi
+}
+
+localpermscheck() {
+  # Checks if private permissions are kosher,
+  # Expects file path as arguement.
+  _perms_private_config="`octalperms ${1}`"
+  if [ ! ${_perms_private_config} = 0600 ] ; then
+    chirp "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+    chirp "@        WARNING: UNPROTECTED PRIVATE CONFIG FILE!        @"
+    chirp "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+    chirp "Permissions ${_perms_private_config} for '${1}' are too open."
+    chirp "It is required that your private auth files are NOT accessible by others, e.g., 0600."
+    die "Aborting."
+  fi
+}
+
+argproc() {
+  # special arg processing to know if the args are for us,
+  # or if we pass them along to a sub-program
+  if [ "`echo "${1}" | try cut -c1`" = '-' ] ; then
+    # treat args local
+    debug "# not calling sub-program first flag starts with '-': ${1}"
+    debug "# args: $@"
+
+    while getopts 'hcvdVDd:' opt; do
+      case "$opt" in
+        v|d) echo "${self##*/}: -v flag not supported, set DEBUG in env instead, e.g.:" 1>&2
+             echo "	# DEBUG=1 ${self##*/} [args...]" 1>&2
+             echo "" 1>&2
+        ;;
+        D) unset VERBOSE
+           unset DEBUG
+        ;;
+        V) debug "${version}"
+           echo "${version}"
+        ;;
+        c) echo "${self##*/}"
+           list_subcommands | sed 's/^[ \t]*//'
+           exit 0
+           # intent is to behave similar to `git -a`
+        ;;
+        h) usage
+           ec=0 summary_usage
+           # intent is to behave similar to `git --help`
+        ;;
+        *) usage
+           exit 129
+        ;;
+      esac
+    done
+    shift $((OPTIND - 1))
+  else
+    # pass args and use sub-program
+    callsubprog "${@}"
+    for i in "$@" ; do
+      debug "# arg: ${i}"
+    done
+  fi
+}
+
+
+## vars
+
+# Ubuntu is a toy, no POSIX and 'realpath(1)'
+if [ -h "${0}" ] ; then
+  self="`readlink -f "$0"`"
+else
+  self="${0}"
+fi
+debug "# self=${self}"
+
+# This version applies only to the 'arcade' program:
+version="${self##*/}_0.1.0"
+export "VERSION=${version}"
+
+## action
+
+debug "##############################################################################"
+# print usage if no args
+if [ -z "$1" ] ; then
+  usage
+  #echo "Available commands"
+  #list_subcommands
+  summary_usage
+fi
+
+debug "# ${self##*/} $@"
+argproc "$@"
+
+exit 0

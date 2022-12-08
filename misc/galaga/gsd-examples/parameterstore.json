@@ -1,0 +1,8 @@
+{
+    "name": "parameterstore",
+    "component_type": "parameterstore",
+    "version": 1,
+    "description": "Module to set up AWS Parameter Store",
+    "service_options": {}
+}
+

@@ -1,0 +1,64 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "Galaga Service Description Schema",
+    "description": "The schema for a Galaga Service Description",
+    "default": {},
+    "examples": [
+        {
+            "service": "hello-world",
+            "version": 1,
+            "description": "Module to create a hello world service",
+            "package_url": "pointer to installer package"
+        }
+    ],
+    "required": [
+        "name",
+        "component_type",
+        "version"
+    ],
+    "properties": {
+        "name": {
+            "$id": "#/properties/service",
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the Galaga service to be referenced by Galaga definitions",
+            "default": "",
+            "examples": [
+                "hello-world"
+            ]
+        },
+        "component_type": {
+            "$id": "#/properties/service",
+            "type": "string",
+            "title": "Component Type",
+            "description": "The type of the Galaga service",
+            "default": "",
+            "examples": [
+                "hello-world"
+            ]
+        },
+        "version": {
+            "$id": "#/properties/version",
+            "type": "integer",
+            "title": "Version",
+            "description": "The version identifier for the Galaga service description",
+            "default": 0,
+            "examples": [
+                1
+            ]
+        },
+        "description": {
+            "$id": "#/properties/description",
+            "type": "string",
+            "title": "Description",
+            "description": "An explanation about the Galaga service",
+            "default": "",
+            "examples": [
+                "Module to create a hello world service"
+            ]
+        }
+    },
+    "additionalProperties": true
+}

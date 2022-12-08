@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+asteroids-msk-update -- GALAGA update the asteroids MSK components
+'''
+
+# @depends: python (>=3.9)
+__version__ = '0.1.3'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Update the ASTEROIDS infrastructure."
+
+import argparse
+import logging
+import os
+from pprint import pprint
+import sys
+
+import boto3
+
+from arclib import alb
+from arclib import common
+from arclib import eks
+from arclib import log
+from arclib import storage
+
+# from asteroids_eks import update_eks_version, update_eks_nodegroup_version
+# from asteroids_eks import update_eks_nodegroup_config
+
+
+def update_asteroids_albs(arcade_name: str, gsd_data: dict) -> bool:
+    """
+    Update the ASTEROIDS ALBs.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+
+    for lb_type in [True, False]:
+        alb_dict = alb.get_alb_dict(arcade_name, lb_type)
+        if not alb.get_alb_status(alb_dict['name']):
+            logging.info(f"Creating {alb_dict['name']} ALB on {arcade_name}")
+            status = create_arcade_alb(arcade_name, lb_type)
+            # pprint(status)
+            if 'Error' in status:
+                return False
+
+    return True
+
+
+def update_asteroids_eks(arcade_name: str,
+                         gsd_data: dict) -> bool:
+    """
+    Update the ASTEROIDS EKS cluster.
+    Only eks_version can be updated at this moment.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    eks_data = gsd_data['services']['eks']['service_options']
+    cluster_prefix = eks_data['cluster_prefix']
+    eks_version = eks_data['eks_version']
+    eks_name = f"{cluster_prefix}-{arcade_name.replace('.', '-')}"
+
+    if not arcade_name or not cluster_prefix or not eks_version:
+        print("Invalid arcade name or cluster prefix or eks version")
+        return False
+
+    current_eks_version = eks.get_eks_status(eks_name)['version']
+    eks_info = eks.get_eks_info(eks_name)
+    if eks_version > current_eks_version:
+        logging.info(f"{cluster_prefix}-{arcade_name}")
+        status = update_eks_version(arcade_name, cluster_prefix, eks_version)
+        if 'Error' in status:
+            return False
+
+    for nodegroup in eks_info['nodegroups']:
+        current_nodegroup_version = eks.get_eks_nodegroup_info(eks_name, nodegroup)['version']
+        if eks_version > current_nodegroup_version:
+            status = update_eks_nodegroup_version(arcade_name,
+                                                  cluster_prefix,
+                                                  nodegroup)
+            if 'Error' in status:
+                return False
+
+    return True
+
+
+def update_asteroids_eks_nodegroup(arcade_name: str,
+                                   gsd_data: dict) -> bool:
+    """
+    Update the ASTEROIDS EKS nodegroups.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    eks_data = gsd_data['services']['eks']['service_options']
+    cluster_prefix = eks_data['cluster_prefix']
+    cluster_name = f"{cluster_prefix}-{arcade_name.replace('.', '-')}"
+    nodegroup_data = gsd_data['services']['nodegroup']['service_options']
+    logging.info(cluster_name)
+
+    eks_info = eks.get_eks_info(cluster_name)
+    for nodegroup_prefix in nodegroup_data.keys():
+        nodegroup_name = f"{nodegroup_prefix}_nodegroup-{arcade_name.replace('.', '-')}"
+        if nodegroup_name in eks_info['nodegroups']:
+            nodegroup_options = nodegroup_data[nodegroup_prefix]
+            nodegroup_options['nodegroup_prefix'] = nodegroup_prefix
+            status = update_eks_nodegroup_config(arcade_name,
+                                                 cluster_prefix,
+                                                 nodegroup_name,
+                                                 nodegroup_options)
+            if not status == "ACTIVE":
+                logging.error(status)
+                return False
+
+    if not apply_awsauth_configmap(arcade_name, cluster_prefix):
+        logging.error("awsauth configmap problem")
+        return False
+
+    if not connect_sg_to_alb(arcade_name, cluster_name, False):
+        logging.error("Did not connect EKS to ALB Private")
+        return False
+
+    if not connect_sg_to_alb(arcade_name, cluster_name, True):
+        logging.error("Did not connect EKS to ALB Public")
+        return False
+
+    return True
+
+
+def main():
+    """
+    %(prog)s - Update the GALAGA asteroids MSK.
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path to filename in s3", required=True)
+
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(1)
+    arcade_name = args.arcade
+    os.environ["AWS_DEFAULT_REGION"] = common.get_arcade_region(arcade_name)
+
+    tmp_dir = os.getenv("ATMP", '/tmp')
+
+    session = boto3.session.Session()
+
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    if not gsd_data:
+        sys.exit(1)
+    pprint(gsd_data)
+# update_broker_count() -> broker nodes
+# update_broker_storage() -> EBS size
+# update_broker_type() -> instance_type
+# update_cluster_configuration() -> config
+# update_cluster_kafka_version() -> version
+# update_configuration()
+
+#    if not update_asteroids_albs(arcade_name, gsd_data):
+#        logging.info("Create ASTEROIDS ALBs failed.")
+#        sys.exit(1)
+
+#    if not update_asteroids_eks_nodegroup(arcade_name, gsd_data):
+#        logging.info("Create AStEROIDS EKS nodegroups failed.")
+#        sys.exit(1)
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

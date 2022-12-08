@@ -1,0 +1,322 @@
+#!/bin/sh
+
+# A time-worn combinator pattern program.
+# Reliably calls sub-programs with correct semantics as though
+# the sub-programs were being called on their own.
+# I ♥  UTF8, 若田
+
+shout() { echo "$0: $*" >&2; }
+die() { shout "$*"; exit 111; }
+try() { "$@" || die "cannot $*"; }
+
+debug() { fd="${fd:-2}";[ -n "$DEBUG" ] && try echo "$*" >&${fd}; }
+chirp() { echo "$*" >&2; }
+
+usage() {
+  # print brief command line usage
+  fd="${fd:-2}" # stderr
+  ec="${ec:-5}" # Input/output error
+  try cat - 2>&$fd << EOF
+usage: ${self##*/} command subcommand [args]
+       ${self##*/} [-v|d|D] [-V]  [-h|c]
+EOF
+}
+
+summary_usage() {
+  # accepts 1 user message as string
+  fd="${fd:-2}" # stderr
+  ec="${ec:-5}" # Input/output error
+  try cat - 2>&$fd << EOF
+`#usage`
+Common ${self##*/} commands:
+
+lighting GRAVITAR
+   arcade grv create       Create a GRV ARCADE VPC from scratch.
+   arcade grv destroy      Hierarchically destroy a GRV.
+
+lighting GALAGA
+   arcade galaga run       Creates galaga services in an ARCADE.
+
+lighting ASTEROIDS
+   arcade asteroid enable  Enables an ASTEROID to be run in an ARCADE.
+   arcade narc reconcile   Reconciles enabled ASTEROIDS, to run them.
+
+
+creating ASD entries
+   arcade asd upload       Upload an ASD json file.
+   arcade asteroid create  Start local creation of an Asteroid json file.
+
+information read tools
+   arcade test aws         Validation for userconnectivity and IAM group/role permission.
+   arcade list             List grv VPC's across global regions.
+
+
+initalize AWS account (fresh AWS account),
+   arcade grv init         Initialize the AWS account for GRV use.
+   arcade gsd init         Initialize the ARCADE for GALAGA use.
+   arcade asd init         Initialize the AWS account for ASTEROIDS use.
+
+Try '${self##*/} -c' for a full list of commands.
+Try '-h' with any command, for more info about that specific command.
+See '${self##*/} help' for an overview of the system.
+EOF
+  [ -n "$1" ] && printf "\n${1}\n"
+  exit "$ec"
+}
+
+callsubprog() {
+  # expects to pass $@ from calling program,
+  # Calls the subcombinator program,
+  # Compares $1 and $2 (named sub-command possibilities) to actual libexec.
+  # If 'foo' and 'foo-bar' both exist, the first order name is the program
+  # used, (e.g. 'foo' wins).  Symlinks are supported.
+  debug "# combinator args: '${1}' '${2}'"
+
+  # currently only one level of combinator inderection allowed,
+
+  debug "# Attempting to determine which program to run."
+  _a_prog_cnt=0
+  debug "# Check for simple command."
+  _subprog="${MYHIER}/libexec/${1}"
+  debug "# _subprog = ${_subprog}"
+  _subprog_exist=''
+  [ -e "${_subprog}" ] && _subprog_exist="${_subprog}"
+  # Match any sub commands with an extension.
+  _subprog_exli=$(echo ${_subprog}.*)
+  debug "# _subprog_exli = ${_subprog_exli}"
+  if [ "$_subprog_exli" = "${_subprog}.*" ]; then
+    debug "# No matching subprog. Ignoring: ${_subprog_exli}"
+    _subprog_exli=''
+  fi
+  [ -n "${_subprog_exist}" ] && _subprog_exli="${_subprog_exist} ${_subprog_exli}"
+  if [ -n "${_subprog_exli}" ]; then
+    debug "# Found Subprogs with extensions: (${_subprog_exli})"
+    debug "# Check each sub simple command found."
+    for _subprog_item in ${_subprog_exli}; do
+      debug "# Checking subprog '${_subprog_item}'"
+      if [ -z `echo "${_subprog_item}" | grep -v '~$'` ]; then
+	# Check for emacs backup files.
+        debug "# Ignoring files ending with a tilda ('~')."
+        continue
+      fi
+      # Check for multiple results in _subprog_exli. This is not allowed.
+      _a_prog_cnt=$((_a_prog_cnt + 1))
+      [ ${_a_prog_cnt} -gt 1 ] && die "# Multiple programs found. Bailing: ${_subprog_exli}"
+      _subprog_ex="${_subprog_item}"
+      debug "#   Found _subprog_ex = '${_subprog_ex}'"
+    done
+  fi
+
+  _a_combo_cnt=0
+  debug "# Check for combo command."
+  _subcombo="${MYHIER}/libexec/${1}-${2}"
+  debug "# _subcombo = ${_subcombo}"
+  _subcombo_exist=''
+  [ -e "${_subcombo}" ] && _subcombo_exist="${_subcombo}"
+  # Match any sub commands with an extension.
+  _subcombo_exli=$(echo ${_subcombo}.*)
+  if [ "$_subcombo_exli" = "${_subcombo}.*" ]; then
+    debug "# No matching subcombo. Ignoring: ${_subcombo_exli}"
+    _subcombo_exli=''
+  fi
+  [ -n "${_subcombo_exist}" ] && _subcombo_exli="${_subcombo_exist} ${_subcombo_exli}"
+  if [ -n "${_subcombo_exli}" ]; then
+    debug "# Found Subcombos with extensions: (${_subcombo_exli})"
+    debug "# Check each sub combo command found."
+    for _subcombo_item in ${_subcombo_exli}; do
+      debug "# Checking subcombo '${_subcombo_item}'"
+      if [ -z `echo ${_subcombo_item} | grep -v '~$'` ]; then
+	# Check for emacs backup files.
+        debug "# Ignoring files ending with a tilda ('~')."
+        continue
+      fi
+      _a_combo_cnt=$((_a_combo_cnt + 1))
+      [ ${_a_combo_cnt} -gt 1 ] && die "# Multiple programs found. Bailing: ${_subcombo_exli}"
+      _subcombo_ex="${_subcombo_item}"
+      debug "#   Found _subcombo_ex = '${_subcombo_ex}'"
+    done
+  fi
+
+  # now lets confirm one of these,
+  if [ -e "${_subprog}" -o -h "${_subprog}" ] ; then
+    subprog="${_subprog}"
+    shift
+    debug "# found first order named program: ${subprog}"
+  elif [ -e "${_subprog_ex}" -o -h "${_subprog_ex}" ] ; then
+    subprog="${_subprog_ex}"
+    shift
+    debug "# found first order named program with file addendum: ${subprog}"
+  elif [ -e "${_subcombo}" -o -h "${_subcombo}" ] ; then
+    subprog="${_subcombo}"
+    shift
+    shift
+    debug "# found second order named program: ${subprog}"
+  elif [ -e "${_subcombo_ex}" -o -h "${_subcombo_ex}"  ] ; then
+    subprog="${_subcombo_ex}"
+    shift
+    shift
+    debug "# found second order named program with file addendum: ${subprog}"
+  else
+    list="`list_subcommands ${1}`"
+    if [ -n "${list}" ]; then
+      usage
+      echo "Available subcommands"
+      list_subcommands "${1}"
+    else
+      echo "${self##*/}: '${1}' is not an ${self##*/} command.  See '${self##*/} -h'." 1>&2
+      # usage
+    fi
+    exit 1
+  fi
+  debug "# sub-program path: ${subprog}"
+  debug "# ${subprog} ${@}"
+
+  # The actual action,
+  ${subprog} "${@}"
+  subexit="${?:-0}"
+  exit "$subexit"
+
+}
+
+list_raw_libexec() {
+  # find first level files and symlinks
+  # returns unsorted list
+  try find ${MYHIER}/libexec -type f -depth 1
+  try find ${MYHIER}/libexec -type l -depth 1
+}
+
+list_commands() {
+  # Find commands in libexec for simple commands.
+  # Ignore (grep -v) files starting with "." or ending in "~".
+  for i in `list_raw_libexec | cut -d"-" -f1 | grep -v '^\.\|~$' | sort -u` ; do
+    _command="`basename ${i}`"
+    echo "  ${_command}"
+  done
+}
+
+list_subcommands() {
+  # Find commands in libexec for combo commands.
+  # Ignore (grep -v) files starting with "." or ending in "~".
+  for i in `list_raw_libexec | grep "${1}" | grep -v '^\.\|~$' | sort` ; do
+    _prog="`basename ${i} | cut -d"." -f1 | sed -e 's/\-/ /' -e 's/^/arcade /'`"
+    echo "  ${_prog}"
+  done
+}
+
+argproc() {
+  # special arg processing to know if the args are for us,
+  # or if we pass them along to a sub-program
+  if [ "`echo "${1}" | try cut -c1`" = '-' ] ; then
+    # treat args local
+    debug "# not calling sub-program first flag starts with '-': ${1}"
+    debug "# args: $@"
+
+    while getopts 'hcvdVDd:' opt; do
+      case "$opt" in
+        v|d) echo "${self##*/}: -v flag not supported, set DEBUG in env instead, e.g.:" 1>&2
+             echo "	# DEBUG=1 ${self##*/} [args...]" 1>&2
+             echo "" 1>&2
+        ;;
+        D) unset VERBOSE
+           unset DEBUG
+        ;;
+        V) debug "${version}"
+           echo "${version}"
+        ;;
+        c) echo "${self##*/}"
+           list_subcommands | sed 's/^[ \t]*//'
+           exit 0
+           # intent is to behave similar to `git -a`
+        ;;
+        h) usage
+           ec=0 summary_usage
+           # intent is to behave similar to `git --help`
+        ;;
+        *) usage
+           exit 129
+        ;;
+      esac
+    done
+    shift $((OPTIND - 1))
+  else
+    # pass args and use sub-program
+    callsubprog "${@}"
+    for i in "$@" ; do
+      debug "# arg: ${i}"
+    done
+  fi
+}
+
+
+## vars
+
+# Ubuntu is a toy, no POSIX and 'realpath(1)'
+if [ -h "${0}" ] ; then
+  self="`readlink -f "$0"`"
+else
+  self="${0}"
+fi
+debug "# self=${self}"
+
+# This version applies only to the 'arcade' program:
+version="${self##*/}_0.1.0"
+export "VERSION=${version}"
+
+# If given, Python won’t try to write .pyc files import of source modules.
+export PYTHONDONTWRITEBYTECODE=1
+
+[ -n "$DEBUG" ] && VERBOSE=1
+debug "# VERBOSE=${VERBOSE}"
+
+dothere=$(cd "${self%/*}" 2>/dev/null; echo "`pwd -L`")
+export DOTHERE="${dothere}"
+debug "# dothere=$dothere"
+_myhier="${dothere%/*}"
+debug "# _myhier=$_myhier"
+export MYHIER="${MYHIER:-$_myhier}"
+debug "# MYHIER=$MYHIER"
+_pythonpath="${MYHIER}/lib/python/arclib"
+debug "# _pythonpath=$_pythonpath"
+export PYTHONPATH="${PYTHONPATH:-$_pythonpath}"
+debug "# PYTHONPATH=$PYTHONPATH"
+
+# source local program config explicitly inside any program which needs it,
+debug "# sourcing ${MYHIER}/etc/${self##*/}.conf"
+. "${MYHIER}/etc/${self##*/}.conf"
+# one big exception for GRV tooling, unified temporary directory acros *NIX platforms,
+
+# does a usable temp dir exist? if not create one with the minimum necessary perms
+_hometmp="${HOME}/tmp/arcade"
+ATMP="${ATMP:-$_hometmp}"
+export "ATMP=${ATMP}"
+debug "# ATMP=$ATMP"
+try mkdir -p -m 0700 ${ATMP}
+
+# AWS API calls requrie a region to be set, even if the API call is
+# to inquire about regions, (e.g describe_regions()), so, hardcode:
+aws_requires_region='us-east-1'
+debug "# aws_requires_region=${aws_requires_region}"
+#
+# We may have our region set by config we've sourced,
+aws_default_region="${aws_default_region:-$aws_requires_region}"
+debug "# Config region value: aws_default_region=${aws_default_region}"
+# We now can export existing AWS_DEFAULT_REGION, or set it:
+#
+export "AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-$aws_default_region}"
+debug "# AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}"
+
+## action
+
+debug "##############################################################################"
+# print usage if no args
+if [ -z "$1" ] ; then
+  usage
+  #echo "Available commands"
+  #list_subcommands
+  summary_usage
+fi
+
+debug "# ${self##*/} $@"
+argproc "$@"
+
+exit 0

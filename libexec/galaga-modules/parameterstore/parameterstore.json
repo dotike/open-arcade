@@ -1,0 +1,11 @@
+{
+  "name": "parameterstore",
+  "component_type": "parameterstore",
+  "version": 1,
+  "description": "GSD for Parameter Store",
+  "services": {
+    "parameterstore": {
+      "service_options": {}
+    }
+  }
+}

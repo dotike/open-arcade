@@ -1,0 +1,7 @@
+{
+    "name": "ecr",
+    "component_type": "ecr",
+    "version": 1,
+    "description": "Module to set up AWS ECR",
+    "service_options": {}
+}

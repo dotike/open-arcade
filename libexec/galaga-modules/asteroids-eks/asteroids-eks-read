@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+asteroids-read -- GALAGA read status and informaation for an asteroids
+'''
+
+# @depends: python (>=3.9)
+__version__ = '0.1.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Check each component of an ASTEROIDS infrastructure."
+
+
+import argparse
+import logging
+import os
+from pprint import pprint
+import sys
+
+import boto3
+
+from arclib import alb
+from arclib import common
+from arclib import eks
+from arclib import log
+from arclib import storage
+from arclib.common import print_status
+
+from asteroids_eks import get_asteroids_fluentd_daemonset_info
+
+
+def main():
+    """
+    %(prog)s - Display asteroids GALAGA information
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path with filename in s3", required=True)
+
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            sys.exit(1)
+    arcade_name = args.arcade
+    os.environ["AWS_DEFAULT_REGION"] = common.get_arcade_region(arcade_name)
+
+    tmp_dir = os.getenv("ATMP", '/tmp')
+
+    session = boto3.session.Session()
+
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    if not gsd_data:
+        sys.exit(1)
+    pprint(gsd_data)
+
+    safe_arcade_name = arcade_name.replace('_', '').replace('.', '-')
+    public_alb = f"public-{safe_arcade_name}"
+    private_alb = f"private-{safe_arcade_name}"
+    status = {}
+    public_status = alb.get_alb_status(public_alb)
+
+    status['public'] = public_status
+
+    private_status = alb.get_alb_status(private_alb)
+
+    status['private'] = private_status
+    logging.info(status)
+    print_status(status)
+
+    if 'Error' in public_status or 'Error' in private_status:
+        sys.exit(1)
+
+    cluster_prefix = gsd_data['services']['eks']['service_options']['cluster_prefix']
+
+    cluster_name = f"{cluster_prefix}-{arcade_name.replace('.', '-')}"
+    logging.info(cluster_name)
+    eks_status = eks.get_eks_status(cluster_name=cluster_name)
+    logging.info(eks_status)
+    print_status(eks_status)
+
+    if 'Error' in eks_status:
+        sys.exit(1)
+
+    nodegroups = gsd_data['services']['nodegroup']['service_options']
+
+    for nodegroup in nodegroups.keys():
+        node_group_name = f"{nodegroup}_nodegroup-{arcade_name.replace('.', '-')}"
+        logging.info(f"{cluster_name} - {node_group_name}")
+        nodegroup_status = eks.get_eks_nodegroup_status(cluster_name, node_group_name)
+        logging.info(nodegroup_status)
+        print_status(nodegroup_status)
+
+        if 'Error' in nodegroup_status:
+            sys.exit(1)
+
+    eks_sg_filter = f"eks-cluster-sg-{cluster_name}"
+
+    if not alb.is_sg_connected(arcade_name, eks_sg_filter, False):
+        logging.error("EKS Security group not connected to ALB Private")
+        sys.exit(1)
+
+    if not alb.is_sg_connected(arcade_name, eks_sg_filter, True):
+        logging.error("EKS security group not connected to ALB Public")
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,12 @@
+{
+    "name": "prometheus",
+    "component_type": "prometheus",
+    "version": 2,
+    "description": "GSD for prometheus",
+    "services": {
+      "prometheus": {
+        "service_options": {}
+      }
+    }
+  }
+  

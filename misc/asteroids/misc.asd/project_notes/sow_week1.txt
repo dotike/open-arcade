@@ -1,0 +1,70 @@
+Mon Jan  4 16:31:57 EST 2021
+This file may be deleted as the tool emerges.
+
+##############################################################################
+Project 1: ASD uploader tool (Asteroid Service Directory)
+
+#### Tool Description
+
+A command line utility which,
+- allows upload of a text/JSON file to S3
+- returns a unique identifier/path where the file can always be read
+  - re-uploading files of the same name *must* return unique identifier
+Uploaded files are intended to be kept and accessible indefinitely.
+
+#### Requirements
+
+- Must store files in structure on S3 which does not just pile up millions or hundreds of millions of files in the same bucket directory.  Implementation suggestions:
+  - hashradix (overkill example discussed, 
+    e.g. md5/a-f 16 ascii chars, by 32 ascii chars deep)
+    - downside: complex to implement, *very hard* to find 
+      files if you loose the hash/path location.
+  - dateradix (recommended approach)
+    - YYYY/MM/DD/HH etc… however granular seems sane
+    - upside: naturally makes implementation of date-range 
+      based searches, or future search indexing, much simpler.
+    - upside: makes it easy to implement glacier-like features
+      to archive old data.
+We’re totally open to other ideas, ike is happy to discuss or be a sounding board if you want to discuss a different direction.
+
+- Must be a command line utility with the following attributes:
+  - must accept input as command line option
+    - bonus/fancy-stuff: doing it as stdin *and* optarg would be awesome, but also overkill.
+  - must return unique file path to stdout
+  - must return all error/debug output to stderr
+
+- One key feature is required up front: ‘-h’ help output
+  - can be written like a UNIX man page, or simpler
+
+
+#### Soft Requirements
+
+- Intended to be written in python3, (>=3.6 I guess), with only dependency being boto3
+  - python libraries outside of python standard lib require *serious* need
+- Intended to be as boringly portable as possible (across *NIX systems, that is)
+
+
+#### Implementation Preferences
+
+- program name is up to you for now, 
+  something short/simple like ‘asd’ is preferred.
+- Simpler is better in the implementation,
+  - This program will be extended in the future, don’t 
+    make it perfect, just stay organized.
+  - We prefer simple functional styles of programming,
+    for “operator barbarian” maintainability.
+  - classes/factory/OOP/etc patterns *must* have a 
+    clearly documented rationale.
+
+#### “Stub” for future requirements
+
+Do not go crazy implementing this week, just be aware for next step requirements:
+- Ability to pre-validate JSON before uploading, based on a JSON schema (TBD)
+- Ability to perform searches for files based on date ranges.
+- AWS role needs (readonly vs. read-write users, etc…)
+- Functional testing ability is key in the future
+  - (unit testing is all you, we just care that the program works)
+- Ability to be installed without requiring a ton of files to be dragged along with it.
+  - installer to $PATH may happen in future in this tool, or, as part of other suite.
+
+##############################################################################

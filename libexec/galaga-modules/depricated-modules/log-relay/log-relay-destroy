@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+log-relay -- Destroy ARCADE scoped log relay.
+'''
+
+# @depends: python (>=3.9)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Destroy ARCADE scoped log relay."
+
+import argparse
+import logging
+import os
+from pprint import pprint
+import sys
+
+import boto3
+
+from arclib import alb
+from arclib import common
+from arclib import dns
+from arclib import log
+from arclib import storage
+
+from log_relay import delete_asg
+from log_relay import delete_asg_template
+from log_relay import delete_asg_configuration
+from log_relay import delete_galaga_nlb
+from log_relay import delete_galaga_nlb_listener
+from log_relay import delete_relay_log_group
+
+
+def destroy_logrelay_asg(arcade_name: str,
+                         gsd_data: dict) -> bool:
+    """
+    Destroy the ARCADE log relay.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    asg_data = gsd_data['services']['asg']['service_options']
+    cluster_prefix = asg_data['cluster_prefix']
+    pprint(asg_data)
+    print("------------")
+
+    status = delete_asg(
+        arcade_name=arcade_name,
+        cluster_prefix=cluster_prefix
+    )
+    # status = False
+    if status:
+        template_status = delete_asg_template(
+            arcade_name=arcade_name,
+            cluster_prefix=cluster_prefix
+        )
+        if not template_status:
+            return False
+        template_status = delete_asg_configuration(
+            arcade_name=arcade_name,
+            cluster_prefix=cluster_prefix
+        )
+        if not template_status:
+            return False
+
+    return True
+
+
+def destroy_logrelay_nlb(arcade_name: str,
+                        gsd_data: dict) -> bool:
+    """
+    Destroy the ARCADE log relay NLB.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    arcade_domain = arcade_name.replace('_', '-')
+    asg_data = gsd_data['services']['asg']['service_options']
+    cluster_prefix = asg_data['cluster_prefix']
+    pprint(asg_data)
+    print("------------")
+
+    lb_public = False
+    lb_type = 'private'
+    lb_port = 514
+    lb_protocol = "tcp_udp"
+    asg_tg_name = f"{lb_type}-{arcade_name}-{cluster_prefix}-{lb_protocol}-{lb_port}"
+
+    dns_source = f"{cluster_prefix}.{arcade_domain}"
+    dns.delete_arcade_cname(arcade_name, dns_source)
+
+    asg_tg_unique_name = alb.create_unique_targetgroup_name(arcade_name,
+                                                            asg_tg_name,
+                                                            lb_type)
+    target_group_info = alb.get_arcade_tg_info(asg_tg_unique_name)
+    target_group_arn = target_group_info.get('TargetGroupArn')
+    print(target_group_arn)
+
+    if target_group_arn:
+        lstn_response = delete_galaga_nlb_listener(arcade_name,
+                                                   cluster_prefix,
+                                                   lb_type,
+                                                   target_group_arn)
+        logging.debug(lstn_response)
+
+    delete_tg_status = alb.delete_arcade_target_group(arcade_name,
+                                                      lb_type,
+                                                      cluster_prefix,
+                                                      lb_protocol,
+                                                      lb_port)
+    logging.debug(f"delete_tg_status: {delete_tg_status}")
+
+    nlb_response = delete_galaga_nlb(arcade_name, cluster_prefix, lb_public)
+    # print(nlb_response)
+    logging.debug(nlb_response)
+
+    return True
+
+
+def main():
+    """
+    %(prog)s - Destroy the ARCADE log relay.
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path to filename in s3", required=True)
+
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(1)
+    arcade_name = args.arcade
+    os.environ["AWS_DEFAULT_REGION"] = common.get_arcade_region(arcade_name)
+
+    session = boto3.session.Session()
+
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    if not gsd_data:
+        sys.exit(1)
+    pprint(gsd_data)
+
+    if not destroy_logrelay_nlb(arcade_name, gsd_data):
+        logging.info("Destroy log relay NLB failed.")
+        sys.exit(1)
+
+    if not destroy_logrelay_asg(arcade_name, gsd_data):
+        logging.info("Destroy log relay ASG cluster failed.")
+        sys.exit(1)
+        
+    if not delete_relay_log_group(arcade_name):
+        logging.info("Log Group was not deleted!")
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

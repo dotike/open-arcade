@@ -1,0 +1,13 @@
+#!/bin/sh
+# -*- mode: shell -*-
+# -*- coding: utf-8 -*-
+
+__version__="0.1"
+__author__="Addepar Infrastructure Platform Tools Team <iptools@addepar.com>"
+__description__="Report the versions of an arcade and all it's commands."
+
+echo "Overall ARCADE version:"
+cat etc/arcade_version; echo ""
+
+echo "Individual command versions:"
+find -L ${ARCADE_HOME} -type f -exec grep -s '__version__ *=' {} /dev/null \; | grep -v "^${ARCADE_HOME}/.git/\|^Binary file\|^${ARCADE_HOME}/docs/\|^${ARCADE_HOME}/misc/" | sort | sed -e 's/__version__//' -e "s/'//g" -e 's/"//g' -e 's/ *= */ = /' -e "s:^${ARCADE_HOME}/::" | awk -F: '{print $1 $2}'

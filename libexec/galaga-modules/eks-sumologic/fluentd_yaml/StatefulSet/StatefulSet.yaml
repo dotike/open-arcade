@@ -1,0 +1,320 @@
+# Source: sumologic/templates/events/fluentd/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-events
+  labels:
+    app: arcade-fluentd-sumologic-fluentd-events
+    chart: "sumologic-2.18.1"
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  selector:
+    matchLabels:
+      app: arcade-fluentd-sumologic-fluentd-events
+  serviceName: arcade-fluentd-sumologic-fluentd-events-headless
+  podManagementPolicy: "Parallel"
+  template:
+    metadata:
+      annotations:
+        checksum/config: 2e232d009589d1d85f6f5c9c1085d028c2d0a64888af35248a4dfaac97d7b79a
+      labels:
+        app: arcade-fluentd-sumologic-fluentd-events
+        chart: "sumologic-2.18.1"
+        release: "arcade-fluentd"
+        heritage: "Helm"
+    spec:
+      serviceAccountName: arcade-fluentd-sumologic
+      volumes:
+      - name: config-volume
+        configMap:
+          name: arcade-fluentd-sumologic-fluentd-events
+      securityContext:
+        fsGroup: 999
+      containers:
+      - name: fluentd-events
+        image: public.ecr.aws/sumologic/kubernetes-fluentd:1.14.6-sumo-5
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 200m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        volumeMounts:
+        - name: config-volume
+          mountPath: /fluentd/etc/
+        - name: buffer
+          mountPath: "/fluentd/buffer"
+        livenessProbe:
+          httpGet:
+            path: /fluentd.pod.healthcheck?json=%7B%22log%22%3A+%22health+check%22%7D
+            port: 9880
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /fluentd.pod.healthcheck?json=%7B%22log%22%3A+%22health+check%22%7D
+            port: 9880
+          initialDelaySeconds: 30
+          periodSeconds: 5
+        env:
+        - name: SUMO_ENDPOINT_DEFAULT_EVENTS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-events
+  volumeClaimTemplates:
+  - metadata:
+      name: buffer
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName:
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+
+# Source: sumologic/templates/logs/fluentd/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-logs
+  labels:
+    app: arcade-fluentd-sumologic-fluentd-logs
+    chart: "sumologic-2.18.1"
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  selector:
+    matchLabels:
+      app: arcade-fluentd-sumologic-fluentd-logs
+  serviceName: arcade-fluentd-sumologic-fluentd-logs-headless
+  podManagementPolicy: "Parallel"
+  replicas: 3
+  template:
+    metadata:
+      annotations:
+        checksum/config: 11f6e97b50e246a15dc48df8990c8dabea4cb97884cf9d70c9e9c6f2ace51df7
+      labels:
+        app: arcade-fluentd-sumologic-fluentd-logs
+        chart: "sumologic-2.18.1"
+        release: "arcade-fluentd"
+        heritage: "Helm"
+    spec:
+      serviceAccountName: arcade-fluentd-sumologic
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - arcade-fluentd-sumologic-fluentd-logs
+                  - arcade-fluentd-sumologic-fluentd-metrics
+                - key: app
+                  operator: In
+                  values:
+                  - prometheus-operator-prometheus
+              topologyKey: "kubernetes.io/hostname"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: arcade-fluentd-sumologic-fluentd-logs
+      securityContext:
+        fsGroup: 999
+      containers:
+      - name: fluentd
+        image: public.ecr.aws/sumologic/kubernetes-fluentd:1.14.6-sumo-5
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 768Mi
+        ports:
+        - name: fluent-bit
+          containerPort: 24321
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /fluentd.pod.healthcheck?json=%7B%22log%22%3A+%22health+check%22%7D
+            port: 9880
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /fluentd.pod.healthcheck?json=%7B%22log%22%3A+%22health+check%22%7D
+            port: 9880
+          initialDelaySeconds: 30
+          periodSeconds: 5
+        volumeMounts:
+        - name: config-volume
+          mountPath: /fluentd/etc/
+        - name: buffer
+          mountPath: "/fluentd/buffer"
+        env:
+        - name: SUMO_ENDPOINT_DEFAULT_LOGS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-logs
+        - name: ADDITIONAL_PLUGINS
+          value: ""
+  volumeClaimTemplates:
+  - metadata:
+      name: buffer
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName: 
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+
+# Source: sumologic/templates/metrics/fluentd/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-metrics
+  labels:
+    app: arcade-fluentd-sumologic-fluentd-metrics
+    chart: "sumologic-2.18.1"
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  selector:
+    matchLabels:
+      app: arcade-fluentd-sumologic-fluentd-metrics
+  serviceName: arcade-fluentd-sumologic-fluentd-metrics-headless
+  podManagementPolicy: "Parallel"
+  replicas: 3
+  template:
+    metadata:
+      annotations:
+        checksum/config: 7b77914b02e79e1ed695b297b5ff1fcf1eea328db89c35eec95b3778ad085ea3
+      labels:
+        app: arcade-fluentd-sumologic-fluentd-metrics
+        chart: "sumologic-2.18.1"
+        release: "arcade-fluentd"
+        heritage: "Helm"
+    spec:
+      serviceAccountName: arcade-fluentd-sumologic
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - arcade-fluentd-sumologic-fluentd-logs
+                  - arcade-fluentd-sumologic-fluentd-metrics
+                - key: app
+                  operator: In
+                  values:
+                  - prometheus-operator-prometheus
+              topologyKey: "kubernetes.io/hostname"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: arcade-fluentd-sumologic-fluentd-metrics
+      securityContext:
+        fsGroup: 999
+      containers:
+      - name: fluentd
+        image: public.ecr.aws/sumologic/kubernetes-fluentd:1.14.6-sumo-5
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 768Mi
+        ports:
+        - name: prom-write
+          containerPort: 9888
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /fluentd.pod.healthcheck?json=%7B%22log%22%3A+%22health+check%22%7D
+            port: 9880
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /fluentd.pod.healthcheck?json=%7B%22log%22%3A+%22health+check%22%7D
+            port: 9880
+          initialDelaySeconds: 30
+          periodSeconds: 5
+        volumeMounts:
+        - name: config-volume
+          mountPath: /fluentd/etc/
+        - name: buffer
+          mountPath: "/fluentd/buffer"
+        env:
+        - name: SUMO_ENDPOINT_APISERVER_METRICS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-metrics-apiserver
+        - name: SUMO_ENDPOINT_CONTROL_PLANE_METRICS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-control_plane_metrics_source
+        - name: SUMO_ENDPOINT_CONTROLLER_METRICS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-metrics-kube-controller-manager
+        - name: SUMO_ENDPOINT_DEFAULT_METRICS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-metrics
+        - name: SUMO_ENDPOINT_KUBELET_METRICS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-metrics-kubelet
+        - name: SUMO_ENDPOINT_NODE_METRICS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-metrics-node-exporter
+        - name: SUMO_ENDPOINT_SCHEDULER_METRICS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-metrics-kube-scheduler
+        - name: SUMO_ENDPOINT_STATE_METRICS_SOURCE
+          valueFrom:
+            secretKeyRef:
+              name: sumologic
+              key: endpoint-metrics-kube-state
+        - name: ADDITIONAL_PLUGINS
+          value: ""
+  volumeClaimTemplates:
+  - metadata:
+      name: buffer
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName: 
+      resources:
+        requests:
+          storage: 10Gi

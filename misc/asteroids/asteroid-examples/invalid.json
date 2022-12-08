@@ -1,0 +1,25 @@
+{
+  "user": "first.last",
+  "createTime": "2021/02/10/22/21",
+  "name": "Invalid",
+  "version": 1,
+  "metadata": {},
+  "services": {
+    "ike-example": {
+      "url": "asd/ike-example/0/2021/02/05/20/11/c5268b4692b807171b8952fce8b828f2.json",
+      "overrides": {
+        "version": 3,
+        "containers/0/mem_limit": 4096
+      }
+    },
+    "nginx-example": {
+      "location": "asd/nginx-example/latest/latest.json",
+      "overrides": {
+        "version": 10,
+        "containers/0/mem": 4096,
+        "containers/0/mem_limit": 8192,
+        "service_options/desired_count": 5
+      }
+    }
+  }
+}

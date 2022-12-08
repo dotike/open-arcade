@@ -1,0 +1,31 @@
+{
+    "service": "rdsservice",
+    "description": "tjones test rds service",
+    "version": 1,
+    "component_type": "rds",
+    "containers": [
+       {
+           "name": "rdservicetest",
+           "instance_type": "db.m4.large",
+           "storage": 25,
+           "engine": "mysql",
+           "username": "admin",
+           "multiAZ": true,
+           "image": "",
+           "readiness_check_path": "",
+           "cpu": 1,
+           "cpu_limit": 1,
+           "mem": 4,
+           "mem_limit": 4,
+           "port_mappings": []
+       }
+    ],
+    "service_options": {
+       "alerting": true,
+       "desired_count": 1,
+       "load_balanced": {
+           "public": true,
+           "private": true
+       }
+    }
+}

@@ -1,0 +1,53 @@
+  268  kubectl get services -A
+  803  kubectl get services -A
+  848  kubectl get services -A
+  858  kubectl get services -A
+  861  kubectl get services -A
+  872  kubectl get services -A
+ 1064  kubectl get services -A
+ 1129  kubectl get services -A
+ 1136  kubectl get services -A
+ 2410  kubectl get services -A
+ 3474  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6
+ 3475  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=true
+ 3476  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6
+ 3477  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6 -h
+ 3479  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6 -h
+ 3480  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6
+ 3481  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes/woof=6
+ 3482  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=true
+ 3483  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes/woof=6
+ 3484  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=true
+ 3485  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6
+ 3486  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=woof
+ 3487  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/node=woof
+ 3488  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes/woof=woof
+ 3489  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes/woof=aarf
+ 3490  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=woof
+ 3491  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes/woof=aarf
+ 3492  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6
+ 3493  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes/woof=6
+ 3494  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=true
+ 3495  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=aarf
+ 3496  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/instance_type=aarf
+ 3497  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/instance_type=true
+ 3498  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/woof=true
+ 3499  ./options-override.py -f asteroids.json -o services/secretsmanager/service_options/woof=true
+ 3500  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6
+ 3501  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=true
+ 3502  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6
+ 3503  ./options-override.py -f asteroids.json -o services/alb/service_options/public=true
+ 3504  ./options-override.py -f asteroids.json -o services/alb/service_options/public=6
+ 3505  ./options-override.py -f asteroids.json -o services/alb/service_options/public=woof
+ 3506  ./options-override.py -f asteroids.json -o services/alb/service_options/public=0
+ 3507  ./options-override.py -f asteroids.json -o services/alb/service_options/public/ouch=0
+ 3508  ./options-override.py -f asteroids.json -o services/alb/service_options/ouch=0
+ 3509  ./options-override.py -f asteroids.json -o services/alb/service_options/ouch="0"
+ 3510  ./options-override.py -f asteroids.json -o services/eks/service_options/eks_version=1.21
+ 3511  ./options-override.py -f asteroids.json -o services/nodegroup/service_options/asteroids/nodes=6
+ 3512  ./options-override.py -f asteroids.json -o services/eks/service_options/eks_version=1.21
+ 3514  ./options-override.py -f asteroids.json -o services/eks/service_options/eks_version=1.21
+ 3516  ./options-override.py -f asteroids.json -o services/eks/service_options/eks_version=1.21
+ 3518  ./options-override.py -f asteroids.json -o services/eks/service_options/eks_version=1.21
+ 5027  history | grep services
+ 5028  history | grep services >libexec/installer/asteroids-eks/examples/service_overrides.history

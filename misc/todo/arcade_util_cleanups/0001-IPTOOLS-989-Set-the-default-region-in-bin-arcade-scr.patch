@@ -1,0 +1,181 @@
+From ada9e9a0a479729f504093db103b6c6418d59ce9 Mon Sep 17 00:00:00 2001
+From: Terry V Bush <99690003+tvbush@users.noreply.github.com>
+Date: Fri, 28 Oct 2022 17:40:23 -0700
+Subject: [PATCH 1/2] IPTOOLS-989: Set the default region in bin/arcade script
+ to us-east-2 like it now has to be and is everywhere else.
+
+Changed the following as well:
+1: Consolidated 2 identical blocks of code into 1 function call. Maintainability enhancement!
+2: Added code to ignore emacs tilde ("~") files. Usability enhancement!
+3: Reduced 2 "find" commands into 1 with the identical result. Speed enhancement!
+4: Completed a comment that was left half written.
+
+Notes:
+There are 3 functions that are not called anywhere. Should they be removed?
+1: list_commands()
+2: octalperms() -- Called only by "localpermscheck()".
+3: localpermscheck()
+
+It is NOT necessary to test for a tilde ("") when checking for a command without an extension because no pattern is used to match the command name. Only commands with an extension are pattern matched where the tilde ("") could be a problem!
+I have tested this with all four possible permutations:
+0 -rwxr-xr-x 1 terry.bush staff 0 Oct 27 14:18 libexec/asteroid-enable.py~*
+0 -rwxr-xr-x 1 terry.bush staff 0 Oct 28 17:18 libexec/aws-role~*
+0 -rwxr-xr-x 1 terry.bush staff 0 Oct 28 17:16 libexec/inventory.py~*
+0 -rwxr-xr-x 1 terry.bush staff 0 Oct 28 17:24 libexec/list~*
+The change now correctly ignores all files ending with a tilde ("~")!
+
+This change requires signoff by Ike!
+---
+ bin/arcade | 98 ++++++++++++++++++++++++++----------------------------
+ 1 file changed, 48 insertions(+), 50 deletions(-)
+
+diff --git a/bin/arcade b/bin/arcade
+index 1436bf1b..e7709bf1 100755
+--- a/bin/arcade
++++ b/bin/arcade
+@@ -64,6 +64,43 @@ EOF
+   exit "$ec"
+ }
+ 
++find_prog() {
++  # args:
++  #   Name of the program to find.
++  #   Command var for no extension.
++  #   Command var for with extension.
++  # Example:
++  #   eval `find_prog asteroid-cat _subcombo _subcombo_ex`
++  _a_prg_cnt=0
++  debug "# Check for simple command."
++  _subprg="${MYHIER}/libexec/${1}"
++  _subprg_exist=''
++  [ -e "${_subprg}" ] && _subprg_exist="${_subprg}"
++  # Match any sub commands with an extension.
++  _subprg_exli=$(echo ${_subprg}.*)
++  if [ "$_subprg_exli" = "${_subprg}.*" ]; then
++    debug "# No matching subprg. Ignoring: ${_subprg_exli}"
++    _subprg_exli=''
++  fi
++  [ -n "${_subprg_exist}" ] && _subprg_exli="${_subprg_exist} ${_subprg_exli}"
++  if [ -n "${_subprg_exli}" ]; then
++    debug "# Found Subprgs with extensions: (${_subprg_exli})"
++    debug "# Check each sub simple command found."
++    for _subprg_item in ${_subprg_exli}; do
++      if [ -z `echo ${_subprg_item} | grep -Ev '~$'` ]; then
++        # Ignore files ending with a tilda ('~'). They are emacs backup files.
++        continue
++      fi
++      _a_prg_cnt=$((_a_prg_cnt + 1))
++      [ ${_a_prg_cnt} -gt 1 ] && die "# Multiple prgrams found. Bailing: ${_subprg_exli}"
++      _subprg_ex="${_subprg_item}"
++      debug "#  _subprg_ex = '${_subprg_ex}'"
++    done
++  fi
++  debug "# Found: ${2}=${_subprg}; ${3}=${_subprg_ex}"
++  echo "${2}=${_subprg}; ${3}=${_subprg_ex}"
++}
++
+ callsubprog() {
+   # expects to pass $@ from calling program,
+   # Calls the subcombinator program,
+@@ -75,51 +112,13 @@ callsubprog() {
+   # currently only one level of combinator inderection allowed,
+ 
+   debug "# Attempting to determine which program to run."
+-  _a_prog_cnt=0
+-  debug "# Check for simple command."
+-  _subprog="${MYHIER}/libexec/${1}"
+-  _subprog_exist=''
+-  [ -e "${_subprog}" ] && _subprog_exist="${_subprog}"
+-  # Match any sub commands with an extension.
+-  _subprog_exli=$(echo ${_subprog}.*)
+-  if [ "$_subprog_exli" = "${_subprog}.*" ]; then
+-    debug "# No matching subprog. Ignoring: ${_subprog_exli}"
+-    _subprog_exli=''
+-  fi
+-  [ -n "${_subprog_exist}" ] && _subprog_exli="${_subprog_exist} ${_subprog_exli}"
+-  if [ -n "${_subprog_exli}" ]; then
+-    debug "# Found Subprogs with extensions: (${_subprog_exli})"
+-    debug "# Check each sub simple command found."
+-    for _subprog_item in ${_subprog_exli}; do
+-      _a_prog_cnt=$((_a_prog_cnt + 1))
+-      [ ${_a_prog_cnt} -gt 1 ] && die "# Multiple programs found. Bailing: ${_subprog_exli}"
+-      _subprog_ex="${_subprog_item}"
+-      debug "#  _subprog_ex = '${_subprog_ex}'"
+-    done
+-  fi
+ 
+-  _a_combo_cnt=0
+-  debug "# Check for combo command."
+-  _subcombo="${MYHIER}/libexec/${1}-${2}"
+-  _subcombo_exist=''
+-  [ -e "${_subcombo}" ] && _subcombo_exist="${_subcombo}"
+-  # Match any sub commands with an extension.
+-  _subcombo_exli=$(echo ${_subcombo}.*)
+-  if [ "$_subcombo_exli" = "${_subcombo}.*" ]; then
+-    debug "# No matching subcombo. Ignoring: ${_subcombo_exli}"
+-    _subcombo_exli=''
+-  fi
+-  [ -n "${_subcombo_exist}" ] && _subcombo_exli="${_subcombo_exist} ${_subcombo_exli}"
+-  if [ -n "${_subcombo_exli}" ]; then
+-    debug "# Found Subcombos with extensions: (${_subcombo_exli})"
+-    debug "# Check each sub combo command found."
+-    for _subcombo_item in ${_subcombo_exli}; do
+-      _a_combo_cnt=$((_a_combo_cnt + 1))
+-      [ ${_a_combo_cnt} -gt 1 ] && die "# Multiple programs found. Bailing: ${_subcombo_exli}"
+-      _subcombo_ex="${_subcombo_item}"
+-      debug "#  _subcombo_ex = '${_subcombo_ex}'"
+-    done
+-  fi
++  # Find the sub programs.
++  eval `find_prog ${1} _subprog _subprog_ex`
++  debug "# _subprog=${_subprog}\n# _subprog_ex=${_subprog_ex}"
++  # Find the sub combo programs.
++  eval `find_prog "${1}-${2}" _subcombo _subcombo_ex`
++  debug "# _subcombo=${_subcombo}\n# _subcombo_ex=${_subcombo_ex}"
+ 
+   # now lets confirm one of these,
+   if [ -e "${_subprog}" -o -h "${_subprog}" ] ; then
+@@ -165,19 +164,18 @@ callsubprog() {
+ list_raw_libexec() {
+ # find first level files and symlinks
+ # returns unsorted list
+-  try find ${MYHIER}/libexec -type f -depth 1
+-  try find ${MYHIER}/libexec -type l -depth 1
++  try find ${MYHIER}/libexec \( -type f -o -type l \) -depth 1
+ }
+ 
+ list_commands() {
+-  for i in `list_raw_libexec | cut -d"-" -f1 | grep -v '^\.' | sort -u` ; do
++  for i in `list_raw_libexec | cut -d"-" -f1 | grep -Ev '^\.|~$' | sort -u` ; do
+     _command="`basename ${i}`"
+     echo "  ${_command}"
+   done
+ }
+ 
+ list_subcommands() {
+-  for i in `list_raw_libexec | grep "${1}" | grep -v '^\.' | sort` ; do
++  for i in `list_raw_libexec | grep "${1}" | grep -Ev '^\.|~$' | sort` ; do
+     _prog="`basename ${i} | cut -d"." -f1 | sed -e 's/\-/ /' -e 's/^/arcade /'`"
+     echo "  ${_prog}"
+   done
+@@ -286,7 +284,7 @@ debug "# sourcing ${MYHIER}/etc/${self##*/}.conf"
+ . "${MYHIER}/etc/${self##*/}.conf"
+ # one big exception for GRV tooling, unified temporary directory acros *NIX platforms,
+ 
+-# does a usable temp dir exist? if not create with 
++# does a usable temp dir exist? if not create one with the minimum necessary perms
+ _hometmp="${HOME}/tmp/arcade"
+ ATMP="${ATMP:-$_hometmp}"
+ export "ATMP=${ATMP}"
+@@ -295,7 +293,7 @@ try mkdir -p -m 0700 ${ATMP}
+ 
+ # AWS API calls requrie a region to be set, even if the API call is
+ # to inquire about regions, (e.g describe_regions()), so, hardcode:
+-aws_requires_region='us-east-1'
++aws_requires_region='us-east-2'
+ debug "# aws_requires_region=${aws_requires_region}"
+ #
+ # We may have our region set by config we've sourced,
+-- 
+2.37.1 (Apple Git-137.1)
+

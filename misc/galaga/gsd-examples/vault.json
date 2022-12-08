@@ -1,0 +1,21 @@
+{
+    "name": "vault",
+    "component_type": "vault",
+    "version": 1,
+    "description": "Module to stand up vault enterpise using terraform",
+    "dependencies": ["secretsmanager"],
+    "service_options": {
+        "cluster_name": "vault",
+        "vault_domain": "toolsdevs.com",
+        "vault_asg_capacity": 3,
+        "vault_instance_type": "m5.xlarge",
+        "vault_node_ami_name": "amzn2-vault-ent-1.6.3-1616533949",
+        "elb_internal": true,
+        "vault_vol_delete_on_termination": true,
+        "vault_ebs_root_vol_type": "gp2",
+        "vault_ebs_root_vol_size": 20,
+        "vault_ebs_vol_encrypted": false,
+        "vault_ebs_data_vol_type": "gp2",
+        "vault_ebs_data_vol_size": 20
+    }
+}

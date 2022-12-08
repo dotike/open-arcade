@@ -1,0 +1,32 @@
+
+# Installer operations sketch, to perform a UNIX style install:
+
+# Set explicit defaults (user can override via inline env?)
+# Possibly provide separate Makefile install option to install into "~/"
+# Note: these are just stub example paths,
+PREFIX=$HOME
+ATMP="${ATMP:-/tmp}"
+
+# All that follows *could* be done cleanly using install(1)
+# utilities install paths:
+  bin/*  -> ${PREFIX}/bin/
+  sbin/* -> ${PREFIX}/sbin/
+  etc/*  -> ${PREFIX}/etc/
+
+  lib/python/* -> ${PYTHONPATH}
+  # this install *could* happen using some pythonic machinery, or, simply install(1)
+  # note: lib names must reference 'arcade' to keep things clear
+  # note: vendored libs must be isolated using 'arcade' name to keep them separate
+
+# subsystems install paths:
+  gravitar  -> ${PREFIX}/arcade/gravitar
+  galaga    -> ${PREFIX}/arcade/galaga
+  asteroids -> ${PREFIX}/arcade/asteroids
+  ? narc    -> ${PREFIX}/arcade/narc or ${PREFIX}/arcade/asteroids/narc
+
+# things not installed in the system, (or, if they are, simply stuff them in "${PREFIX}/arcade/")
+- misc
+- README.md
+- LICENSE
+- Tests
+

@@ -1,0 +1,22 @@
+{
+    "user": "first.last",
+    "createTime": "2021/03/17/20/58",
+    "name": "test-Asteroid",
+    "version": 1,
+    "metadata": {},
+    "services": {
+        "nginxaarf": {
+            "location": "asd/nginxaarf/latest/latest.json",
+            "overrides": {}
+        },
+        "nginxwoof": {
+            "location": "asd/nginxwoof/latest/latest.json",
+            "overrides": {
+                "service_options/desired_count": 2
+            }
+        }
+    },
+    "namespace": "testAsteroid",
+    "environment": "dev",
+    "desired_state": ""
+}

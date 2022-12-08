@@ -1,0 +1,11 @@
+{
+  "name": "galagazero",
+  "component_type": "galagazero",
+  "version": 1,
+  "description": "Data for GALAGA zero",
+  "services": {
+    "parameterstore": {
+      "service_options": {}
+    }
+  }
+}

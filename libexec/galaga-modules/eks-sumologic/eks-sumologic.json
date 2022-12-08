@@ -1,0 +1,17 @@
+{
+    "name": "eks-sumologic",
+    "component_type": "eks-sumologic",
+    "version": 2,
+    "description": "GSD for eks-sumologic",
+    "services": {
+        "sumologic": {
+            "service_options": {
+                "account_name": "ConeyIsland",
+                "repo_name": "arcade/fluentd-kubernetes-sumologic",
+                "container_name": "public.ecr.aws/sumologic/kubernetes-fluentd:latest-amd64",
+                "eks_namespace_name": "fluentd",
+                "sumoapi_secrets_manager_name": "sumo_keys"
+            }
+        }
+    }
+}

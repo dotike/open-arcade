@@ -1,0 +1,48 @@
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    meta.helm.sh/release-name: promethus-for-arcade
+    meta.helm.sh/release-namespace: prometheus
+  labels:
+    app: prometheus
+    app.kubernetes.io/managed-by: Helm
+    chart: prometheus-15.10.5
+    component: server
+    heritage: Helm
+    release: promethus-for-arcade
+  name: promethus-for-arcade-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: promethus-for-arcade-server
+subjects:
+- kind: ServiceAccount
+  name: iamproxy-service-account
+  namespace: prometheus
+  
+  
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    meta.helm.sh/release-name: promethus-for-arcade
+    meta.helm.sh/release-namespace: prometheus
+  labels:
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/instance: promethus-for-arcade
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/version: 2.5.0
+    helm.sh/chart: kube-state-metrics-4.13.0
+  name: promethus-for-arcade-kube-state-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: promethus-for-arcade-kube-state-metrics
+subjects:
+- kind: ServiceAccount
+  name: promethus-for-arcade-kube-state-metrics
+  namespace: prometheus

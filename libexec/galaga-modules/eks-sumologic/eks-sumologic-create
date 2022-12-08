@@ -1,0 +1,522 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+eks-sumologic-create -- GALAGA create sumologic componet
+'''
+
+# @depends: python (>=3.9)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Create the ASTEROIDS infrastructure."
+
+import argparse
+import logging
+import os
+import sys
+import yaml
+import subprocess
+import boto3
+import docker
+import base64
+import time
+import json
+
+from kubernetes.client.rest import ApiException
+from kubernetes import client
+from botocore.exceptions import ClientError
+from pprint import pprint
+from arclib import common, log, storage, k8s, common, ecr, eks
+from arclib import secrets_manager as SM
+
+# Import libary
+import eks_sumologic_fluentd
+
+
+
+# --------------------------------------------------------------------
+# get_sumologic_secrets()
+# --------------------------------------------------------------------
+
+def get_sumologic_secrets(account_name, secret_name):
+
+    data = f"{account_name}/{secret_name}"
+
+    account  = json.loads(SM.get_secret(data))
+
+    return account['sumo_id'], account['sumo_key']
+    # End of get_sumologic_secrets
+
+# --------------------------------------------------------------------
+# create_repo()
+#--------------------------------------------------------------------
+def create_repo(arcade_name: str, repository_name: str) -> bool:
+    """Creates a ECR Repository in AWS
+
+    Args:
+        arcade_name (str): Name of the arcade
+        repository_name (str): name of the repository
+
+    Returns:
+        bool: True if repo was created, False if it failed to create
+    """
+    current_region = common.get_arcade_region(arcade_name)
+    ecr_client = boto3.client('ecr', region_name=current_region)
+    try:
+        ecr_client.create_repository(repositoryName=repository_name)
+        return True
+    except ecr_client.exceptions.RepositoryAlreadyExistsException:
+        return False
+
+
+
+# --------------------------------------------------------------------
+# get_nodegroup_status()
+# --------------------------------------------------------------------
+def get_nodegroup_status(cluster_name: str, arcade_name: str) -> str:
+    """Gets the Status of the Nodegroup for a EKS cluster
+
+    Args:
+        cluster_name (str): Name of the EKS cluster
+        arcade_name (str): Name of the Arcade
+
+    Returns:
+        str: a string rep of the status
+    """
+    format_arcade_name = arcade_name.replace('.', '-')
+    nodegroup_name = f"asteroids_nodegroup-{format_arcade_name}"
+    eks_client = boto3.client('eks')
+    try:
+        response = eks_client.describe_nodegroup(clusterName=cluster_name, nodegroupName=nodegroup_name)
+        return response['nodegroup']['status']
+    except ClientError as e:
+        return 'Not Active'
+    # End of get_nodegroup_status
+    
+
+# --------------------------------------------------------------------
+# get_eks_status()
+#--------------------------------------------------------------------
+def get_eks_status(cluster_name: str):
+    """
+    Return the status of a EKS cluster.
+
+    Args:
+        cluster_name: cluster name
+
+    Returns:
+        status dict of the response or exception dict
+    """
+    eks_client = boto3.client('eks')
+    try:
+        response = eks_client.describe_cluster(name=cluster_name)
+    except ClientError as c_e:
+        return 'Not Active'
+
+    return response['cluster']['status']
+
+
+# --------------------------------------------------------------------
+# build_sumologic_container() / NOTE: MAYBE NOT NEEDED
+# --------------------------------------------------------------------
+def build_sumologic_container() -> bool:
+    """Builds the Sumologic Docker Image
+
+    Returns:
+        bool: True if container was built, False if not
+    """
+    client = docker.from_env()
+    try:
+        client.images.build(
+            path='libexec/galaga-modules/eks-fluentd/fluentd-kubernetes-daemonset/debian-syslog',
+            tag='arcade/fluentd-kubernetes-syslog')
+        return True
+    except client.errors.BuildError:
+        return False
+    except client.errors.APIError:
+        return False
+    
+    
+# --------------------------------------------------------------------
+# check_sumologic_present()
+# --------------------------------------------------------------------
+def check_sumologic_present(repo_name):
+    """Checks to make sure Sumologic Container is in ECR
+
+    Returns:
+        _type_: True if container is in ECR, False if not.
+    """
+    #repo = 'arcade/fluentd-kubernetes-syslog'
+    #repo = 'arcade/fluentd-kubernetes-sumologic'
+    repo = repo_name
+    client = boto3.client('ecr')
+    try:
+        client.describe_repositories(repositoryNames=[repo])
+        return True
+    except client.exceptions.RepositoryNotFoundException:
+        return False
+
+    
+# --------------------------------------------------------------------
+# login_to_ecr_and_push_image() / NOTE: May not be needed
+# --------------------------------------------------------------------
+def login_to_ecr_and_push_image(arcade_name: str, repo_name):
+    """
+    Authenticate to ECR Registery, Build Sumologic Image for ECR, and push image to ECR.
+
+    Args:
+        arcade_name (str): Name of the Arcade
+
+    Returns:
+        bool: True if success, False if not.
+    """
+    #repo_docker_image = 'arcade/fluentd-kubernetes-syslog'
+    
+    if not check_sumologic_present(repo_name):
+        pprint('sumologic repo in ecr is missing..... creating now')
+        if not create_repo(arcade_name=arcade_name, repository_name=repo_name):
+            pprint('Error, Failed to create ecr repository for sumologic')
+            return False
+    
+    docker_client = docker.from_env()
+    current_region = common.get_arcade_region(arcade_name)
+    ecr_client = boto3.client('ecr', region_name=current_region)
+    token = ecr_client.get_authorization_token()
+    username, password = base64.b64decode(token['authorizationData'][0]['authorizationToken']).decode().split(':')
+    registry = token['authorizationData'][0]['proxyEndpoint'].replace("https://", "")
+    docker_login = f"docker login -u {username} -p {password} {registry}"
+    p = subprocess.Popen([docker_login], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+    p.communicate()
+        
+    login = docker_client.login(username, password, registry=registry)
+    aws_account_num = boto3.client('sts').get_caller_identity().get('Account')
+    ecr_tag = f'{aws_account_num}.dkr.ecr.{current_region}.amazonaws.com/{repo_name}'
+    
+    if login['Status'] == 'Login Succeeded':
+        lets_build_sumologic_locally = build_sumologic_container()
+        if lets_build_sumologic_locally:
+            find_sumologic_img = docker_client.images.get(name='arcade/fluentd-kubernetes-syslog:latest')
+            tag = find_sumologic_img.tag(repository=ecr_tag, tag='latest')
+            if tag:
+                docker_client.images.push(f"{ecr_tag}", tag='latest')
+                pprint('Sumologic image is present in ECR')
+                docker_client.images.remove(image=ecr_tag, force=True)
+                docker_client.images.remove(image='arcade/fluentd-kubernetes-syslog:latest', force=True)
+                return True
+            else:
+                return False
+        else:
+            return False
+
+
+# --------------------------------------------------------------------
+# main()
+# --------------------------------------------------------------------
+def main():
+    """_summary_
+    """
+    RS = common.ReturnStatus()
+    
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path to filename in s3", required=True)
+    
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+    
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(RS.NOT_OK)
+    
+    arcade_name = args.arcade
+    os.environ["AWS_DEFAULT_REGION"] = common.get_arcade_region(arcade_name)
+
+    tmp_dir = os.getenv("ATMP", '/tmp')
+  
+    session = boto3.session.Session()
+    
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+    
+    
+    eks_cluster = eks.arcade_to_cluster_name(arcade_name=arcade_name)
+
+    # --------------------------------------------------------------------
+    # GSD Data
+    # --------------------------------------------------------------------
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+
+    if not gsd_data:
+        print("GSD NOT found")
+        sys.exit(RS.NOT_OK)
+    # pprint(gsd_data)
+    componet = gsd_data['component_type']
+    description = gsd_data['description']
+    name = gsd_data['name']
+    application = list(gsd_data['services'].keys())[0]
+    options = json.dumps(gsd_data['services']['sumologic']['service_options'], sort_keys=True, indent=4, default=str)
+    print(
+        f" Componet: {componet}\n Description: {description}\n Name: {name}\n Application: {application}\n Application Options: {options}"
+    )
+    service_options = gsd_data['services']['sumologic']['service_options']
+    sumo_fluent_namespace = service_options['eks_namespace_name']
+    account_name = service_options['account_name']
+    secretsmanager_name = service_options['sumoapi_secrets_manager_name']
+
+    
+    # --------------------------------------------------------------------
+    # SumoLogic secrets
+    # --------------------------------------------------------------------
+    sumo_access_id, sumo_access_key = get_sumologic_secrets(account_name, secretsmanager_name)
+    if len(sumo_access_id) <= 0:
+        print("The sumo access id is not defined in the GSD.")
+        sys.exit(RS.NOT_OK)
+        
+    if len(sumo_access_key) <= 0:
+        print("The sumo access key is not defined in the GSD.")
+        sys.exit(RS.NOT_OK)
+
+    # Container Name
+    container_name = service_options['container_name']
+    if len(container_name) <= 0:
+        print("Container name missing.")
+        parser.print_help()
+        sys.exit(RS.NOT_OK)
+
+    # Repo Name
+    repo_name = service_options['repo_name']
+    if len(repo_name) <= 0:
+        print("Repo name missing.")
+        parser.print_help()
+        sys.exit(RS.NOT_OK)
+            
+
+    # --------------------------------------------------------------------
+    # Check to see if the EKS cluster is active before starting install
+    # --------------------------------------------------------------------
+    eks_status_list = []
+    offical_status = get_eks_status(cluster_name=eks_cluster)
+    eks_status_list.insert(0, str(offical_status))
+    while eks_status_list[0] != 'ACTIVE':
+        time.sleep(5)
+        new_status = get_eks_status(cluster_name=eks_cluster)
+        
+        if eks_status_list[0] == 'Not Active':
+            logging.info('Not Active')
+            eks_status_list.insert(0, str(new_status))
+            continue
+        if eks_status_list[0] == 'CREATING':
+            eks_status_list.insert(0, str(new_status))
+            logging.info('Creating')
+            continue
+        if eks_status_list[0] == 'ACTIVE':
+            logging.info('Active')
+            pprint('EKS is Active')
+            break
+        if eks_status_list[0] == 'PENDING':
+            eks_status_list.insert(0, str(new_status))
+            logging.info('PENDING')
+            continue
+        if eks_status_list[0] == 'UPDATING':
+            eks_status_list.insert(0, str(new_status))
+            logging.info('UPDATING')
+            continue
+   
+    # --------------------------------------------------------------------
+    # Check to see if nodegroups of the eks cluster are active before starting install
+    # --------------------------------------------------------------------
+    nodegroup_status_list = []
+    offical_nodegroup_status = get_nodegroup_status(cluster_name=eks_cluster,
+                                                    arcade_name=arcade_name)
+    nodegroup_status_list.insert(0, str(offical_nodegroup_status))
+    
+    while nodegroup_status_list[0] != 'ACTIVE':
+        time.sleep(5)
+        new_nodegroup_status = get_nodegroup_status(cluster_name=eks_cluster,
+                                                    arcade_name=arcade_name)
+        
+        if nodegroup_status_list[0] == 'Not Active':
+            logging.info('nodegroup is not active')
+            nodegroup_status_list.insert(0, str(new_nodegroup_status))
+            continue
+        if nodegroup_status_list[0] == 'CREATING':
+            logging.info('nodegroup is creating')
+            nodegroup_status_list.insert(0, str(new_nodegroup_status))
+            continue
+        if nodegroup_status_list[0] == 'UPDATING':
+            logging.info('nodegroup is updating')
+            nodegroup_status_list.insert(0, str(new_nodegroup_status))
+            continue
+        if nodegroup_status_list[0] == 'ACTIVE':
+            logging.info('nodegroup is active')
+            break
+    
+    # Adding in Sleep to give AWS/EKS a bit to become ready
+    time.sleep(60)
+    
+    # Check Fluentd Image is present, If not, lets make sure it becomes present.
+    # Lets make sure we don't need this
+    if not check_sumologic_present(repo_name):
+        pprint('Fluentd repo/image is not in ECR.')
+        sys.exit(RS.NOT_OK)
+    
+    # Set the eks cluster context
+    k8s.load_arcade_k8s_config(arcade_name)
+    
+    # Start of Sumologic Install 
+    
+    # --------------------------------------------------------------------
+    # Create Namespace 
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.create_namespace(namespace=sumo_fluent_namespace, arcade_name=arcade_name):
+        pprint(f'ERROR: Namespace failed to be created.')
+        logging.info('ERROR: Namespace failed to be created.')
+        sys.exit(RS.NOT_OK)
+    
+    # --------------------------------------------------------------------
+    # Create CRD 
+    # --------------------------------------------------------------------
+    # TODO We need to fix the replace in this function.... this failed last time it was already present. 
+    if not eks_sumologic_fluentd.deploy_crd(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: CRD failed to be created.')
+        logging.info('ERROR: CRD failed to be created.')
+        sys.exit(RS.NOT_OK)
+    
+    # --------------------------------------------------------------------
+    # Create PodSecurityPolices
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_pod_security_policy(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: PodSecurityPolices failed to be created.')
+        logging.info('ERROR: PodSecurityPolices failed to be created.')
+        sys.exit(RS.NOT_OK)
+    
+    # --------------------------------------------------------------------
+    # Create PodDisruptionBudget
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_pod_disruption_budget(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: PodDisruptionBudget failed to be created.')
+        logging.info('ERROR: PodDisruptionBudget failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create ServiceAccounts
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_service_account(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: ServiceAccounts failed to be created.')
+        logging.info('ERROR: ServiceAccounts failed to be created.')
+        sys.exit(RS.NOT_OK)
+    
+    # --------------------------------------------------------------------
+    # Create Secrets
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_secret(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster, sumo_id=sumo_access_id, sumo_key=sumo_access_key):
+        pprint(f'ERROR: Secrets failed to be created.')
+        logging.info('ERROR: Secrets failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create ConfigMap
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_configmaps(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: ConfigMap failed to be created.')
+        logging.info('ERROR: ConfigMap failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create ClusterRole
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_cluster_role(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: ClusterRole failed to be created.')
+        logging.info('ERROR: ClusterRole failed to be created.')
+        sys.exit(RS.NOT_OK)
+    
+    # --------------------------------------------------------------------
+    # Create ClusterRoleBinding
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_cluster_role_bindings(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: ClusterRoleBinding failed to be created.')
+        logging.info('ERROR: ClusterRoleBinding failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create Service
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_service(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: Service failed to be created.')
+        logging.info('ERROR: Service failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create DaemonSet
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_daemonset(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: DaemonSet failed to be created.')
+        logging.info('ERROR: DaemonSet failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create Deployment
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_deployment(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: Deployment failed to be created.')
+        logging.info('ERROR: Deployment failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create StatefulSet
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_stateful_set(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: StatefulSet failed to be created.')
+        logging.info('ERROR: StatefulSet failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create Prometheus
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_prometheus(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: Prometheus failed to be created.')
+        logging.info('ERROR: Prometheus failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create PriorityClass
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_priority_class(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: PriorityClass failed to be created.')
+        logging.info('ERROR: PriorityClass failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create Pod
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_pod(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: Pod failed to be created.')
+        logging.info('ERROR: Pod failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    # --------------------------------------------------------------------
+    # Create Job
+    # --------------------------------------------------------------------
+    if not eks_sumologic_fluentd.deploy_job(namespace=sumo_fluent_namespace, arcade_name=arcade_name, eks_cluster=eks_cluster):
+        pprint(f'ERROR: Job failed to be created.')
+        logging.info('ERROR: Job failed to be created.')
+        sys.exit(RS.NOT_OK)
+
+    
+    sys.exit(RS.OK)
+    # End of Sumologic Install 
+    
+    
+# --------------------------------------------------------------------
+# entry point of main()
+# --------------------------------------------------------------------
+if __name__ == '__main__':
+    main()

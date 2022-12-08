@@ -1,0 +1,47 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "Galaga schema",
+    "description": "The schema that defines a Galaga layer",
+    "default": {},
+    "required": [
+        "user",
+        "createTime",
+        "name",
+        "version",
+        "components"
+    ],
+    "properties": {
+        "user": {
+            "$id": "#/properties/user",
+            "type": "string",
+            "title": "User",
+            "description": "The user who created the schema"
+        },
+        "createTime": {
+            "$id": "#/properties/createTime",
+            "type": "string",
+            "title": "CreateTime",
+            "description": "The time (%Y/%m/%d/%H/%M) the asteroid json is created"
+        },
+        "name": {
+            "$id": "#/properties/name",
+            "type": "string",
+            "title": "Name",
+            "description": "The Arcade name for the Galaga layer"
+        },
+        "version": {
+            "$id": "#/properties/version",
+            "type": "integer",
+            "title": "Version",
+            "description": "The version of the galaga"
+        },
+        "components": {
+            "$id": "#/properties/components",
+            "type": "object",
+            "title": "Components",
+            "description": "An explanation about the purpose of this instance."
+        }
+    }
+}

@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+# @depends: boto3, python (>=3.7)
+__version__ = '0.0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Lists Security Groups, account-wide, open as inet-facing."
+__usage__ = """
+This program outputs large complete data sets with no input, and each command line option act a some form of filter.
+
+This program walks all available regions, some options greatly improve speed by reducing scope of return.
+
+Filters using '-E' or '-I' optargs perform IP address matching from the start of the explicit string supplied, metacharacters are not processed.  (Equivalent to searching for '^string*'.)  This allows simple IP address filtering, so a search for 0.0.0.0 does not return addresses like 10.0.0.0/28 by mistake.
+
+EXAMPLE USE:
+
+    % arcade audit sg -J
+    ...returns all security groups for an AWS account as JSON
+
+    % arcade audit sg -r us-east-2
+    ...returns all security groups for one region
+
+    % arcade audit sg -A <ARCADE_NAME>
+    ...returns all security groups for one ARCADE
+
+    Other filters can be applied in combinations,
+    % arcade audit sg -E 10.2 -I 0.0.0.0
+    % arcade audit sg -E 10.2 -I 0.0.0.0 -p 80 -P 22
+
+
+IP address options support both IPv4 and IPv6.
+"""
+
+import argparse
+import boto3
+import sys
+import os
+import json
+import ipaddress
+
+from arclib import grv as grv
+from arclib import storage, log, common
+
+
+def print_cli_out(in_dict):
+    """
+    Builds multi-line text block for CLI default output.
+    """
+
+    text_return="""
+               """
+    for sg_uid in in_dict.keys():
+        try:
+            arcade_name = str(in_dict[sg_uid]['TagSane']['grv_name'])
+        except:
+            arcade_name = '-'
+        text_return = text_return + str('{} {} {} {} {}\n').format(
+              sg_uid,
+              in_dict[sg_uid]['GroupName'],
+              in_dict[sg_uid]['region'],
+              in_dict[sg_uid]['VpcId'],
+              arcade_name
+        )
+    return text_return
+
+
+def format_and_output(in_dict: dict, args):
+    if args.jsonpretty:
+        print(json.dumps(in_dict, indent=4, sort_keys=True, default=str))
+    elif args.json:
+        print(json.dumps(in_dict, sort_keys=True, default=str))
+    elif args.dictpretty:
+        grv.prettyPrint(in_dict)
+    else:
+        if in_dict:
+            print(common.columnate(print_cli_out(in_dict)))
+    sys.exit(0)
+
+
+def return_ingress_networks(sg_dict, in_out):
+    """
+    Given a seurity group rule dict, returns a list of all IPv4 and IPv6 addresses.
+
+    Input:
+        sg_dict - A security group dict.
+        in_out - string "in" or "out", ingress vs egress
+
+    Output:
+        A list of strings containing all IPv4/IPv6 networks, containing
+        redundant copies of the networks to provide all posible string names.
+
+        For IPv4 networks, two representations are returned:
+          - literal (may be mixed expansion, or not have subnet CIDR)
+          - expanded notation (always includes CIDR)
+
+        For IPv6 networks, three representations are returned:
+          - literal (may be mixed expansion, or not have subnet CIDR)
+          - compressed notation (always includes CIDR)
+          - expanded notation
+    """
+    ip_list_return = []
+
+    if in_out == 'in':
+        rule_direction = 'IpPermissions'
+    elif in_out == 'out':
+        rule_direction = 'IpPermissionsEgress'
+    else:
+        raise AttributeError('ireturn_ingress_networks() requires string "in" or "out"')
+
+    for rule in sg_dict.get(rule_direction): # ingress
+
+        for range in rule.get('IpRanges', {}):
+            v4_raw = str(range.get('CidrIp', ''))
+            if v4_raw:
+                v4_expanded = str(ipaddress.ip_network(v4_raw, ''))
+            else:
+                v4_expanded = ''
+            ip_list_return.append(v4_raw)
+            ip_list_return.append(v4_expanded)
+
+        for range in rule.get('Ipv6Ranges', {}):
+            v6_raw = str(range.get('CidrIpv6', ''))
+            if v6_raw:
+                v6_net = ipaddress.ip_network(v6_raw, '')
+                v6_compressed = str(v6_net.compressed)
+                v6_expanded = str(v6_net.exploded)
+            else:
+                v6_expanded = ''
+                v6_compressed = ''
+            ip_list_return.append(v6_raw)
+            ip_list_return.append(v6_compressed)
+            ip_list_return.append(v6_expanded)
+
+    return ip_list_return
+
+
+def main():
+    """
+    Process args and take action.
+    """
+    parser = argparse.ArgumentParser(
+        description=__description__,
+        epilog=__usage__,
+        prog='arcade audit sg',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("-A", "--arcade", help='Optional Arcade Name, reduce scope to one Arcade.')
+    parser.add_argument("-r", "--region", help='Optional region scope, default is all regions available.')
+    parser.add_argument("-I", "--ingress-ip", help='Filter for ingress ip CIDR, string literal. ')
+    parser.add_argument("-E", "--egress-ip", help='Filter for outbound ip CIDR, string literal. ')
+    parser.add_argument("-p", "--to-port", help='int, Filter specific "ToPort".')
+    parser.add_argument("-P", "--from-port", help='int, Filter specific "FromPort".')
+    parser.add_argument("-j", "--json", action='store_true', help='JSON output.')
+    parser.add_argument("-J", "--jsonpretty", action='store_true', help='PrettyPrint JSON output.')
+    parser.add_argument("-D", "--dictpretty", action='store_true',
+                        help='PrettyPrint Python Dict, legible convienence for developement.')
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+
+    # Validate that aws credentials are valid
+    common.validate_aws_creds()
+
+    log.set_log_level(args.verbose)
+
+    sg_list_return = {}
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME', "")
+
+    if args.arcade:
+        sg_list = grv.list_grv_security_groups(args.arcade)
+    else:
+        sg_list = grv.list_account_security_groups(args.region)
+
+    # ip search filtering,
+    if args.ingress_ip:
+        for sgid in sg_list.keys():
+            sfound = -1
+            for addr in return_ingress_networks(sg_list.get(sgid), 'in'):
+                sfound = addr.find(str(args.ingress_ip))
+            if sfound == 0:
+                sg_list_return[sgid] = sg_list.get(sgid)
+    elif args.egress_ip:
+        for sgid in sg_list.keys():
+            sfound = -1
+            for addr in return_ingress_networks(sg_list.get(sgid), 'out'):
+                sfound = addr.find(str(args.egress_ip))
+            if sfound == 0:
+                sg_list_return[sgid] = sg_list.get(sgid)
+    else:
+        sg_list_return = sg_list
+
+    # filter ports,
+    if args.to_port:
+        dict_port_to_return = {}
+        for sgid in sg_list_return.keys():
+            for rule in sg_list_return[sgid]['IpPermissions']:
+                rule_toport = int(rule.get('ToPort', -1))
+                if rule_toport == int(args.to_port):
+                    dict_port_to_return[sgid] = sg_list_return[sgid]
+        sg_list_return = dict_port_to_return
+
+    if args.from_port:
+        dict_return_from = {}
+        for sgid in sg_list_return.keys():
+            for rule in sg_list_return[sgid]['IpPermissions']:
+                rule_toport = int(rule.get('FromPort', -1))
+                if rule_toport == int(args.from_port):
+                    dict_return_from[sgid] = sg_list_return[sgid]
+        sg_list_return = dict_return_from
+
+    format_and_output(sg_list_return, args)
+
+
+if __name__ == '__main__':
+    main()

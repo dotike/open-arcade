@@ -1,0 +1,3564 @@
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/additionalPrometheusRules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kube-prometheus-stack-pre-1.14-node-rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+    - name: node-pre-1.14.rules
+      rules:
+      - expr: sum(min(kube_pod_info) by (node))
+        record: ':kube_pod_info_node_count:'
+      - expr: 1 - avg(rate(node_cpu_seconds_total{job="node-exporter",mode="idle"}[1m]))
+        record: :node_cpu_utilisation:avg1m
+      - expr: |-
+          1 - avg by (node) (
+            rate(node_cpu_seconds_total{job="node-exporter",mode="idle"}[1m])
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:)
+        record: node:node_cpu_utilisation:avg1m
+      - expr: |-
+          1 -
+          sum(
+            node_memory_MemFree_bytes{job="node-exporter"} +
+            node_memory_Cached_bytes{job="node-exporter"} +
+            node_memory_Buffers_bytes{job="node-exporter"}
+          )
+          /
+          sum(node_memory_MemTotal_bytes{job="node-exporter"})
+        record: ':node_memory_utilisation:'
+      - expr: |-
+          sum by (node) (
+            (
+              node_memory_MemFree_bytes{job="node-exporter"} +
+              node_memory_Cached_bytes{job="node-exporter"} +
+              node_memory_Buffers_bytes{job="node-exporter"}
+            )
+            * on (namespace, pod) group_left(node)
+              node_namespace_pod:kube_pod_info:
+          )
+        record: node:node_memory_bytes_available:sum
+      - expr: |-
+          (node:node_memory_bytes_total:sum - node:node_memory_bytes_available:sum)
+          /
+          node:node_memory_bytes_total:sum
+        record: node:node_memory_utilisation:ratio
+      - expr: |-
+          1 -
+          sum by (node) (
+            (
+              node_memory_MemFree_bytes{job="node-exporter"} +
+              node_memory_Cached_bytes{job="node-exporter"} +
+              node_memory_Buffers_bytes{job="node-exporter"}
+            )
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:
+          )
+          /
+          sum by (node) (
+            node_memory_MemTotal_bytes{job="node-exporter"}
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:
+          )
+        record: 'node:node_memory_utilisation:'
+      - expr: 1 - (node:node_memory_bytes_available:sum / node:node_memory_bytes_total:sum)
+        record: 'node:node_memory_utilisation_2:'
+      - expr: |-
+          max by (instance, namespace, pod, device) ((node_filesystem_size_bytes{fstype=~"ext[234]|btrfs|xfs|zfs"}
+          - node_filesystem_avail_bytes{fstype=~"ext[234]|btrfs|xfs|zfs"})
+          / node_filesystem_size_bytes{fstype=~"ext[234]|btrfs|xfs|zfs"})
+        record: 'node:node_filesystem_usage:'
+      - expr: |-
+          sum by (node) (
+            node_memory_MemTotal_bytes{job="node-exporter"}
+            * on (namespace, pod) group_left(node)
+              node_namespace_pod:kube_pod_info:
+          )
+        record: node:node_memory_bytes_total:sum
+      - expr: |-
+          sum(irate(node_network_receive_bytes_total{job="node-exporter",device!~"veth.+"}[1m])) +
+          sum(irate(node_network_transmit_bytes_total{job="node-exporter",device!~"veth.+"}[1m]))
+        record: :node_net_utilisation:sum_irate
+      - expr: |-
+          sum by (node) (
+            (irate(node_network_receive_bytes_total{job="node-exporter",device!~"veth.+"}[1m]) +
+            irate(node_network_transmit_bytes_total{job="node-exporter",device!~"veth.+"}[1m]))
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:
+          )
+        record: node:node_net_utilisation:sum_irate
+      - expr: |-
+          sum(irate(node_network_receive_drop_total{job="node-exporter",device!~"veth.+"}[1m])) +
+          sum(irate(node_network_transmit_drop_total{job="node-exporter",device!~"veth.+"}[1m]))
+        record: :node_net_saturation:sum_irate
+      - expr: |-
+          sum by (node) (
+            (irate(node_network_receive_drop_total{job="node-exporter",device!~"veth.+"}[1m]) +
+            irate(node_network_transmit_drop_total{job="node-exporter",device!~"veth.+"}[1m]))
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:
+          )
+        record: node:node_net_saturation:sum_irate
+      - expr: |-
+          sum(node_load1{job="node-exporter"})
+          /
+          sum(node:node_num_cpu:sum)
+        record: ':node_cpu_saturation_load1:'
+      - expr: avg(irate(node_disk_io_time_weighted_seconds_total{job="node-exporter",device=~"nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+"}[1m]))
+        record: :node_disk_saturation:avg_irate
+      - expr: |-
+          avg by (node) (
+            irate(node_disk_io_time_weighted_seconds_total{job="node-exporter",device=~"nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+"}[1m])
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:
+          )
+        record: node:node_disk_saturation:avg_irate
+      - expr: avg(irate(node_disk_io_time_seconds_total{job="node-exporter",device=~"nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+"}[1m]))
+        record: :node_disk_utilisation:avg_irate
+      - expr: |-
+          avg by (node) (
+            irate(node_disk_io_time_seconds_total{job="node-exporter",device=~"nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+"}[1m])
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:
+          )
+        record: node:node_disk_utilisation:avg_irate
+      - expr: |-
+          1e3 * sum(
+            (rate(node_vmstat_pgpgin{job="node-exporter"}[1m])
+          + rate(node_vmstat_pgpgout{job="node-exporter"}[1m]))
+          )
+        record: :node_memory_swap_io_bytes:sum_rate
+      - expr: |-
+          1e3 * sum by (node) (
+            (rate(node_vmstat_pgpgin{job="node-exporter"}[1m])
+          + rate(node_vmstat_pgpgout{job="node-exporter"}[1m]))
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:
+          )
+        record: node:node_memory_swap_io_bytes:sum_rate
+      - expr: |-
+          node:node_cpu_utilisation:avg1m
+            *
+          node:node_num_cpu:sum
+            /
+          scalar(sum(node:node_num_cpu:sum))
+        record: node:cluster_cpu_utilisation:ratio
+      - expr: |-
+          (node:node_memory_bytes_total:sum - node:node_memory_bytes_available:sum)
+          /
+          scalar(sum(node:node_memory_bytes_total:sum))
+        record: node:cluster_memory_utilisation:ratio
+      - expr: |-
+          sum by (node) (
+            node_load1{job="node-exporter"}
+          * on (namespace, pod) group_left(node)
+            node_namespace_pod:kube_pod_info:
+          )
+          /
+          node:node_num_cpu:sum
+        record: 'node:node_cpu_saturation_load1:'
+      - expr: |-
+          max by (instance, namespace, pod, device) (
+            node_filesystem_avail_bytes{fstype=~"ext[234]|btrfs|xfs|zfs"}
+            /
+            node_filesystem_size_bytes{fstype=~"ext[234]|btrfs|xfs|zfs"}
+            )
+        record: 'node:node_filesystem_avail:'
+      - expr: |-
+          max(
+            max(
+              kube_pod_info{job="kube-state-metrics", host_ip!=""}
+            ) by (node, host_ip)
+            * on (host_ip) group_right (node)
+            label_replace(
+              (
+                max(node_filesystem_files{job="node-exporter", mountpoint="/"})
+                by (instance)
+              ), "host_ip", "$1", "instance", "(.*):.*"
+            )
+          ) by (node)
+        record: 'node:node_inodes_total:'
+      - expr: |-
+          max(
+            max(
+              kube_pod_info{job="kube-state-metrics", host_ip!=""}
+            ) by (node, host_ip)
+            * on (host_ip) group_right (node)
+            label_replace(
+              (
+                max(node_filesystem_files_free{job="node-exporter", mountpoint="/"})
+                by (instance)
+              ), "host_ip", "$1", "instance", "(.*):.*"
+            )
+          ) by (node)
+        record: 'node:node_inodes_free:'
+
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/servicemonitors.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: collection-sumologic-fluentd-logs
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+    sumologic.com/app: fluentd-logs
+spec:
+  endpoints:
+    - port: metrics
+  namespaceSelector:
+    matchNames:
+    - $(NAMESPACE)
+  selector:
+    matchLabels:
+      sumologic.com/app: fluentd-logs
+      sumologic.com/scrape: "true"
+
+---
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: collection-sumologic-otelcol-logs
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+    sumologic.com/app: otelcol-logs
+spec:
+  endpoints:
+    - port: otelcol-metrics
+  namespaceSelector:
+    matchNames:
+    - $(NAMESPACE)
+  selector:
+    matchLabels:
+      sumologic.com/app: fluentd-logs
+      sumologic.com/scrape: "true"
+
+---
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: collection-sumologic-fluentd-metrics
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+    sumologic.com/app: fluentd-metrics
+spec:
+  endpoints:
+    - port: metrics
+  namespaceSelector:
+    matchNames:
+    - $(NAMESPACE)
+  selector:
+    matchLabels:
+      sumologic.com/app: fluentd-metrics
+      sumologic.com/scrape: "true"
+---
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: collection-sumologic-otelcol-metrics
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+    sumologic.com/app: otelcol-metrics
+spec:
+  endpoints:
+    - port: otelcol-metrics
+  namespaceSelector:
+    matchNames:
+    - $(NAMESPACE)
+  selector:
+    matchLabels:
+      sumologic.com/app: fluentd-metrics
+      sumologic.com/scrape: "true"
+---
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: collection-sumologic-fluentd-events
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+    sumologic.com/app: fluentd-events
+spec:
+  endpoints:
+    - port: metrics
+  namespaceSelector:
+    matchNames:
+    - $(NAMESPACE)
+  selector:
+    matchLabels:
+      sumologic.com/app: fluentd-events
+      sumologic.com/scrape: "true"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: collection-fluent-bit
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+    sumologic.com/app: collection-fluent-bit
+spec:
+  endpoints:
+    - path: /api/v1/metrics/prometheus
+      port: http
+  namespaceSelector:
+    matchNames:
+    - $(NAMESPACE)
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fluent-bit
+      sumologic.com/scrape: "true"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: collection-sumologic-otelcol-logs-collector
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+    sumologic.com/app: otelcol-logs-collector
+spec:
+  endpoints:
+    - port: metrics
+  namespaceSelector:
+    matchNames:
+    - $(NAMESPACE)
+  selector:
+    matchLabels:
+      sumologic.com/app: otelcol-logs-collector
+      sumologic.com/scrape: "true"
+--- 
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: collection-sumologic-otelcol-traces
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+    sumologic.com/app: otelcol
+spec:
+  endpoints:
+    - port: metrics
+  namespaceSelector:
+    matchNames:
+    - $(NAMESPACE)
+  selector:
+    matchLabels:
+      sumologic.com/component: traces
+      sumologic.com/scrape: "true"
+---
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: collection-sumologic-prometheus
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  endpoints:
+    - path: /metrics
+      port: web
+  namespaceSelector:
+    matchNames:
+    - $(NAMESPACE)
+  selector:
+    matchLabels:
+      operated-prometheus: "true"
+
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/prometheus.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: arcade-fluentd-kube-promet-prometheus
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  alerting:
+    alertmanagers:
+      []
+  image: quay.io/prometheus/prometheus:v2.22.1
+  version: v2.22.1
+  externalUrl: http://arcade-fluentd-kube-promet-prometheus.fluentd:9090
+  paused: false
+  replicas: 1
+  logLevel:  info
+  logFormat:  logfmt
+  listenLocal: false
+  enableAdminAPI: false
+  scrapeInterval: 30s
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  retention: "1d"
+  walCompression: true
+  routePrefix: "/"
+  serviceAccountName: arcade-fluentd-kube-promet-prometheus
+  serviceMonitorSelector:
+    matchLabels:
+      release: "arcade-fluentd"
+
+  serviceMonitorNamespaceSelector: {}
+  podMonitorSelector:
+    matchLabels:
+      release: "arcade-fluentd"
+
+  podMonitorNamespaceSelector: {}
+  probeSelector:
+    matchLabels:
+      release: "arcade-fluentd"
+
+  probeNamespaceSelector: {}
+  remoteWrite:
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.state
+      writeRelabelConfigs:
+      - action: keep
+        regex: kube-state-metrics;(?:kube_statefulset_status_observed_generation|kube_statefulset_status_replicas|kube_statefulset_replicas|kube_statefulset_metadata_generation|kube_daemonset_status_current_number_scheduled|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_number_misscheduled|kube_daemonset_status_number_unavailable|kube_deployment_spec_replicas|kube_deployment_status_replicas_available|kube_deployment_status_replicas_unavailable|kube_node_info|kube_node_status_allocatable|kube_node_status_capacity|kube_node_status_condition|kube_hpa_spec_max_replicas|kube_hpa_spec_min_replicas|kube_hpa_status_(condition|(current|desired)_replicas)|kube_service_info|kube_service_spec_external_ip|kube_service_spec_type|kube_service_status_load_balancer_ingress)
+        sourceLabels:
+        - job
+        - __name__
+      - action: labelmap
+        regex: (pod|service)
+        replacement: service_discovery_${1}
+      - action: labeldrop
+        regex: (pod|service|container)
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.state
+      writeRelabelConfigs:
+      - action: keep
+        regex: kube-state-metrics;(?:kube_pod_status_phase)
+        sourceLabels:
+        - job
+        - __name__
+      - action: labeldrop
+        regex: container
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.state
+      writeRelabelConfigs:
+      - action: keep
+        regex: kube-state-metrics;(?:kube_pod_container_info|kube_pod_container_resource_requests|kube_pod_container_resource_limits|kube_pod_container_status_ready|kube_pod_container_status_terminated_reason|kube_pod_container_status_waiting_reason|kube_pod_container_status_restarts_total)
+        sourceLabels:
+        - job
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.controller-manager
+      writeRelabelConfigs:
+      - action: keep
+        regex: kubelet;cloudprovider_.*_api_request_duration_seconds.*
+        sourceLabels:
+        - job
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.scheduler
+      writeRelabelConfigs:
+      - action: keep
+        regex: kube-scheduler;scheduler_(?:e2e_scheduling|binding|framework_extension_point|scheduling_algorithm)_duration_seconds.*
+        sourceLabels:
+        - job
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.apiserver
+      writeRelabelConfigs:
+      - action: keep
+        regex: apiserver;(?:apiserver_request_(?:count|total)|apiserver_request_(?:duration_seconds|latencies)_(?:count|sum)|apiserver_request_latencies_summary(?:|_count|_sum)|etcd_request_cache_(?:add|get)_(?:duration_seconds|latencies_summary)_(?:count|sum)|etcd_helper_cache_(?:hit|miss)_(?:count|total))
+        sourceLabels:
+        - job
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.kubelet
+      writeRelabelConfigs:
+      - action: keep
+        regex: kubelet;(?:kubelet_docker_operations_errors(?:|_total)|kubelet_(?:docker|runtime)_operations_duration_seconds_(?:count|sum)|kubelet_running_(?:container|pod)(?:_count|s)|kubelet_(:?docker|runtime)_operations_latency_microseconds(?:|_count|_sum))
+        sourceLabels:
+        - job
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.container
+      writeRelabelConfigs:
+      - action: labelmap
+        regex: container_name
+        replacement: container
+      - action: drop
+        regex: POD
+        sourceLabels:
+        - container
+      - action: keep
+        regex: kubelet;.+;(?:container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_fs_usage_bytes|container_fs_limit_bytes|container_cpu_cfs_throttled_seconds_total)
+        sourceLabels:
+        - job
+        - container
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.container
+      writeRelabelConfigs:
+      - action: keep
+        regex: kubelet;(?:container_network_receive_bytes_total|container_network_transmit_bytes_total)
+        sourceLabels:
+        - job
+        - __name__
+      - action: labeldrop
+        regex: container
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.node
+      writeRelabelConfigs:
+      - action: keep
+        regex: node-exporter;(?:node_load1|node_load5|node_load15|node_cpu_seconds_total)
+        sourceLabels:
+        - job
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.operator.rule
+      writeRelabelConfigs:
+      - action: keep
+        regex: 'cluster_quantile:apiserver_request_duration_seconds:histogram_quantile|instance:node_filesystem_usage:sum|instance:node_network_receive_bytes:rate:sum|cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile|cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile|cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile|cluster_quantile:scheduler_framework_extension_point_duration_seconds:histogram_quantile|node_namespace_pod:kube_pod_info:|:kube_pod_info_node_count:|node:node_num_cpu:sum|:node_cpu_utilisation:avg1m|node:node_cpu_utilisation:avg1m|node:cluster_cpu_utilisation:ratio|:node_cpu_saturation_load1:|node:node_cpu_saturation_load1:|:node_memory_utilisation:|node:node_memory_bytes_total:sum|node:node_memory_utilisation:ratio|node:cluster_memory_utilisation:ratio|:node_memory_swap_io_bytes:sum_rate|node:node_memory_utilisation:|node:node_memory_utilisation_2:|node:node_memory_swap_io_bytes:sum_rate|:node_disk_utilisation:avg_irate|node:node_disk_utilisation:avg_irate|:node_disk_saturation:avg_irate|node:node_disk_saturation:avg_irate|node:node_filesystem_usage:|node:node_filesystem_avail:|:node_net_utilisation:sum_irate|node:node_net_utilisation:sum_irate|:node_net_saturation:sum_irate|node:node_net_saturation:sum_irate|node:node_inodes_total:|node:node_inodes_free:'
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:up|prometheus_remote_storage_.*|fluentd_.*|fluentbit.*|otelcol.*)
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.control-plane.coredns
+      writeRelabelConfigs:
+      - action: keep
+        regex: coredns;(?:coredns_cache_(size|entries|(hits|misses)_total)|coredns_dns_request_duration_seconds_(count|sum)|coredns_(dns_request|dns_response_rcode|forward_request)_count_total|coredns_(forward_requests|dns_requests|dns_responses)_total|process_(cpu_seconds_total|open_fds|resident_memory_bytes))
+        sourceLabels:
+        - job
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.control-plane.kube-etcd
+      writeRelabelConfigs:
+      - action: keep
+        regex: kube-etcd;(?:etcd_debugging_(mvcc_db_total_size_in_bytes|store_(expires_total|watchers))|etcd_disk_(backend_commit|wal_fsync)_duration_seconds_bucket|etcd_grpc_proxy_cache_(hits|misses)_total|etcd_network_client_grpc_(received|sent)_bytes_total|etcd_server_(has_leader|leader_changes_seen_total)|etcd_server_proposals_(pending|(applied|committed|failed)_total)|process_(cpu_seconds_total|open_fds|resident_memory_bytes))
+        sourceLabels:
+        - job
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.nginx-ingress
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:nginx_ingress_controller_ingress_resources_total|nginx_ingress_controller_nginx_(last_reload_(milliseconds|status)|reload(s|_errors)_total)|nginx_ingress_controller_virtualserver(|route)_resources_total|nginx_ingress_nginx_connections_(accepted|active|handled|reading|waiting|writing)|nginx_ingress_nginx_http_requests_total|nginx_ingress_nginxplus_(connections_(accepted|active|dropped|idle)|http_requests_(current|total)|resolver_(addr|formerr|name|noerror|notimp|nxdomain|refused|servfail|srv|timedout|unknown)|ssl_(handshakes_failed|session_reuses)|stream_server_zone_(connections|received|sent)|stream_upstream_server_(active|connect_time|fails|health_checks_fails|health_checks_unhealthy|received|response_time|sent|unavail|state)|(location|server)_zone_(discarded|received|requests|responses|sent|processing)|upstream_server_(fails|header_time|health_checks_fails|health_checks_unhealthy|received|sent|unavail|response_time|responses|requests)))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.nginx
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:nginx_(accepts|active|handled|reading|requests|waiting|writing)|nginx_plus_api_connections_(accepted|active|dropped|idle)|nginx_plus_api_http_caches_(cold|hit_bytes|max_size|miss_bytes|size|updating_bytes)|nginx_plus_api_http_location_zones_(discarded|received|requests|sent)|nginx_plus_api_http_location_zones_responses_(1xx|2xx|3xx|4xx|5xx|total)|nginx_plus_api_http_requests_(current|total)|nginx_plus_api_http_server_zones_(discarded|processing|received|requests|sent)|nginx_plus_api_http_server_zones_responses_(1xx|2xx|3xx|4xx|5xx|total)|nginx_plus_api_http_upstream_peers_(backup|downtime|fails|healthchecks_fails|healthchecks_unhealthy|received|requests|sent|unavail|response_time)|nginx_plus_api_http_upstream_peers_responses_(1xx|2xx|3xx|4xx|5xx|total)|nginx_plus_api_resolver_zones_(addr|formerr|name|noerror|notimp|nxdomain|refused|servfail|srv|timedout)|nginx_plus_api_ssl_(handshakes_failed|session_reuses)|nginx_plus_api_stream_server_zones_(connections|received|sent)|nginx_plus_api_stream_upstream_peers_(active|backup|connect_time|downtime|fails|healthchecks_fails|healthchecks_last_passed|healthchecks_unhealthy|received|response_time|sent|unavail))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.redis
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:redis_((blocked_|)clients|cluster_enabled|cmdstat_calls|connected_slaves|(evicted|expired|tracking_total)_keys|instantaneous_ops_per_sec|keyspace_(hitrate|hits|misses)|(master|slave)_repl_offset|maxmemory|mem_fragmentation_(bytes|ratio)|rdb_changes_since_last_save|rejected_connections|total_commands_processed|total_net_(input|output)_bytes|uptime|used_(cpu_(sys|user)|memory(_overhead|_rss|_startup|))))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.jmx
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:java_lang_(ClassLoading_(TotalL|Unl|L)oadedClassCount|Compilation_TotalCompilationTime|GarbageCollector_(Collection(Count|Time)|LastGcInfo_(GcThreadCount|duration|(memoryU|u)sage(After|Before)Gc_.*_used))|MemoryPool_(CollectionUsage(ThresholdSupported|_committed|_max|_used)|(Peak|)Usage_(committed|max|used)|UsageThresholdSupported)|Memory_((Non|)HeapMemoryUsage_(committed|max|used)|ObjectPendingFinalizationCount)|OperatingSystem_(AvailableProcessors|(CommittedVirtual|(Free|Total)(Physical|))MemorySize|(Free|Total)SwapSpaceSize|(Max|Open)FileDescriptorCount|ProcessCpu(Load|Time)|System(CpuLoad|LoadAverage))|Runtime_(BootClassPathSupported|Pid|Uptime|StartTime)|Threading_(CurrentThread(AllocatedBytes|(Cpu|User)Time)|(Daemon|Peak|TotalStarted|)ThreadCount|(ObjectMonitor|Synchronizer)UsageSupported|Thread(AllocatedMemory.*|ContentionMonitoring.*|CpuTime.*))))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.kafka
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:kafka_(broker_.*|controller_.*|java_lang_.*|partition_.*|purgatory_.*|network_.*|replica_.*|request_.*|topic_.*|topics_.*|zookeeper_.*))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.mysql
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:mysql_((uptime|connection_errors_.*|queries|slow_queries|questions|table_open_cache_.*|table_locks_.*|commands_.*|select_.*|sort_.*|mysqlx_connections_.*|mysqlx_worker_.*|connections|aborted_.*|locked_connects|bytes_.*|qcache_.*|threads_.*|opened_.*|created_tmp_.*)|innodb_(buffer_pool_.*|data_.*|rows_.*|row_lock_.*|log_waits)|perf_schema_(events_statements_.*|table_io_waits_.*|index_io_waits_.*|read.*|write.*)))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.postgresql
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:postgresql_(blks_(hit|read)|buffers_(backend|checkpoint|clean)|checkpoints_(req|timed)|db_size|deadlocks|flush_lag|heap_blks_(hit|read)|idx_blks_(hit|read)|idx_scan|idx_tup_(fetch|read)|index_size|n_dead_tup|n_live_tup|n_tup_(upd|ins|del|hot_upd)|num_locks|numbackends|replay_lag|replication_(delay|lag)|seq_scan|seq_tup_read|stat_ssl_compression_count|table_size|tidx_blks_(hit|read)|toast_blks_(hit|read)|tup_(deleted|fetched|inserted|returned|updated)|write_lag|xact_(commit|rollback)))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.apache
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:apache_((BusyWorkers|BytesPerReq|BytesPerSec|CPUChildrenSystem|CPUChildrenUser|CPULoad|CPUSystem|CPUUser|DurationPerReq|IdleWorkers|Load1|Load15|Load5|ParentServerConfigGeneration|ParentServerMPMGeneration|ReqPerSec|ServerUptimeSeconds|TotalAccesses|TotalDuration|TotalkBytes|Uptime)|(scboard_(closing|dnslookup|finishing|idle_cleanup|keepalive|logging|open|reading|sending|starting|waiting))))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.sqlserver
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:sqlserver_(cpu_sqlserver_process_cpu|database_io_(read_(bytes|latency_ms)|write_(bytes|latency_ms))|memory_clerks_size_kb|performance_value|server_properties_server_memory|volume_space_(total_space_bytes|used_space_bytes)))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.haproxy
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:haproxy_(active_servers|backup_servers|bin|bout|chkfail|ctime|dreq|dresp|econ|ereq|eresp|http_response_(1xx|2xx|3xx|4xx|5xx|other)|qcur|qmax|qtime|rate|rtime|scur|slim|smax|ttime|weight|wredis|wretr))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.cassandra
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:cassandra_(CacheMetrics_ChunkCache_OneMinuteRate|ClientMetrics_(connectedNativeClients_Value|RequestDiscarded_OneMinuteRate)|CommitLogMetrics_(CompletedTasks_Value|PendingTasks_Value)|DroppedMessageMetrics_Dropped_OneMinuteRate|java_(GarbageCollector_(ConcurrentMarkSweep|ParNew)_(CollectionCount|CollectionTime|LastGcInfo_duration|LastGcInfo_GcThreadCount|LastGcInfo_memoryUsageAfterGc_.*_used|LastGcInfo_memoryUsageBeforeGc_.*_used)|Memory_HeapMemoryUsage_used|OperatingSystem_(AvailableProcessors|FreePhysicalMemorySize|SystemCpuLoad|TotalPhysicalMemorySize|TotalSwapSpaceSize))|Net_FailureDetector_(DownEndpointCount|UpEndpointCount)|TableMetrics_(AllMemtablesHeapSize_Value|AllMemtablesLiveDataSize_Value|CompactionBytesWritten_Count|EstimatedPartitionCount_Value|KeyCacheHitRate_Value|LiveSSTableCount_Value|MemtableColumnsCount_Value|MemtableLiveDataSize_Value|MemtableOffHeapSize_Value|MemtableOnHeapSize_Value|MemtableSwitchCount_Count|PendingCompactions_Value|PendingFlushes_Count|PercentRepaired_Value|RangeLatency_Count|ReadLatency_50thPercentile|ReadLatency_Max|ReadLatency_OneMinuteRate|RowCacheHit_Count|RowCacheMiss_Count|SSTablesPerReadHistogram_50thPercentile|SSTablesPerReadHistogram_99thPercentile|SSTablesPerReadHistogram_Count|SSTablesPerReadHistogram_Max|TombstoneScannedHistogram_50thPercentile|TombstoneScannedHistogram_99thPercentile|TombstoneScannedHistogram_Max|TotalDiskSpaceUsed_Count|WaitingOnFreeMemtableSpace_Max|WriteLatency_50thPercentile|WriteLatency_99thPercentile|WriteLatency_Max|WriteLatency_OneMinuteRate)|ThreadPoolMetrics_(internal_(Count|Value)|request_(Count|Value)|transport_(Count|Value))))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.mongodb
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:mongodb_(active_(reads|writes)|commands_per_sec|connections_current|db_stats_storage_size|deletes_per_sec|document_.*|flushes_per_sec|getmores_per_sec|inserts_per_sec|net_.*_bytes_count|open_connections|page_faults|percent_cache_(dirty|used)|queries_per_sec|queued_(reads|writes)|repl_((commands|deletes|getmores|inserts|oplog|queries|updates)_per_sec|queries|oplog_window_sec)|resident_megabytes|updates_per_sec|uptime_ns|vsize_megabytes|wtcache_bytes_read_into))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.rabbitmq
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:rabbitmq_(exchange_messages_publish_(in_rate|in|out_rate|out)|node_(disk_free_limit|disk_free|mem_(limit|used)|uptime|fd_used|mnesia_(disk_tx_count|ram_tx_count)|gc_num_rate)|overview_(clustering_listerners|connections|exchanges|consumers|queues|messages_(delivered|published|unacked))|queue_(consumers|memory|slave_nodes|messages_(publish_rate|deliver_rate|memory|max_time|unack))))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.tomcat
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:tomcat_(connector_(bytes_(received|sent)|current_(thread_(busy|count)|threads_busy)|error_count|max_threads|max_time|processing_time|request_count)|jmx_(jvm_memory_(HeapMemoryUsage_(max|used)|NonHeapMemoryUsage_(max|used))|OperatingSystem_(FreePhysicalMemorySize|FreeSwapSpaceSize|SystemCpuLoad|TotalPhysicalMemorySize|TotalSwapSpaceSize)|Servlet_processingTime)|jvm_memory_(free|max|total)|jvm_memorypool_(bytes_(received|sent)|current_thread_count|current_threads_busy|error_count|max_threads|max_time|max|processing_time|request_count|used)))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.varnish
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:varnish_(backend_(busy|conn|fail|recycle|req|retry|reuse|unhealthy)|bans_(completed|deleted|dups|lurker_(contention|obj_killed|tests_tested|tested|)|obj_killed|obj|persisted_(bytes|fragmentation))|bans|boot_.*_.*_(bodybytes|hdrbytes)|cache_(hit_grace|hitpass|miss|hit)|client_(req_400|req_417|req|resp_500)|n_(backend|expired|lru_nuked|vcl_avail)|pools|s0_g_(bytes|space)|s_(fetch|pipe_(in|out)|req_(bodybytes|hdrbytes)|resp_(bodybytes|hdrbytes)|sess)|sess_(closed_err|closed|conn|drop|dropped|fail|queued)|thread_queue_len|threads_(created|destroyed|failed|limited)|threads|uptime|vmods))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.memcached
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:memcached_(accepting_conns|auth_(cmds|errors)|bytes_(read|written)|bytes|cas_*|cmd_.*|conn_yields|connection_structures|curr_(connections|items)|decr_.*|delete_.*|evictions|get_(hits|misses)|hash_(bytes|is_expanding)|incr_.*|limit_maxbytes|listen_disabled_num|reclaimed|threads|total_(connections|items)|uptime))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.elasticsearch
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:elasticsearch_(cluster_health_(active_(primary_shards|shards)|delayed_unassigned_shards|indices_status_code|initializing_shards|number_of_(data_nodes|nodes|pending_tasks)|relocating_shards|unassigned_shards)|clusterstats_(indices_fielddata_evictions|nodes_jvm_mem_heap_used_in_bytes)|fs_total_(free_in_bytes|total_in_bytes)|indices_(flush_(total|total_time_in_millis)|get_(exists_time_in_millis|exists_total|missing_time_in_millis|missing_total|time_in_millis|total)|indexing_delete_time_in_millis|indexing_delete_total|indexing_index_time_in_millis|indexing_index_total|merges_total_time_in_millis|search_query_time_in_millis|search_query_total|segments_fixed_bit_set_memory_in_bytes|segments_terms_memory_in_bytes|stats_primaries_(docs_count|indexing_index_time_in_millis|query_cache_cache_size|query_cache_evictions|segments_doc_values_memory_in_bytes|segments_index_writer_memory_in_bytes|segments_memory_in_bytes)|stats_total___(fielddata_memory_size_in_bytes|indexing_index_total|merges_total)|stats_total_(docs_count|fielddata_memory_size_in_bytes|flush_total_time_in_millis|indexing_delete_total|indexing_index_time_in_millis|indexing_index_total|merges_total_docs|merges_total_size_in_bytes|merges_total_time_in_millis|query_cache_evictions|refresh_total|refresh_total_time_in_millis|search_fetch_time_in_millis|search_fetch_total|search_query_time_in_millis|search_query_total|segments_fixed_bit_set_memory_in_bytes|segments_index_writer_memory_in_bytes|segments_memory_in_bytes|segments_terms_memory_in_bytes|store_size_in_bytes|translog_operations|translog_size_in_bytes))|jvm_(gc_collectors_.*_collection_time_in_millis|mem_heap_committed_in_bytes|mem_heap_used_in_bytes|mem_heap_used_percent)|os_cpu_(load_average_5m|percent)|process_open_file_descriptors|thread_pool_(analyze_completed|analyze_threads|get_rejected|search_queue)|transport_(rx_size_in_bytes|tx_size_in_bytes)))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.activemq
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:activemq_(topic_.*|queue_.*|.*_QueueSize|broker_(AverageMessageSize|CurrentConnectionsCount|MemoryLimit|StoreLimit|TempLimit|TotalConnectionsCount|TotalConsumerCount|TotalDequeueCount|TotalEnqueueCount|TotalMessageCount|TotalProducerCount|UptimeMillis)|jvm_memory_(HeapMemoryUsage_max|HeapMemoryUsage_used|NonHeapMemoryUsage_used)|jvm_runtime_Uptime|OperatingSystem_(FreePhysicalMemorySize|SystemCpuLoad|TotalPhysicalMemorySize)))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.couchbase
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:couchbase_(node_.*|bucket_(ep_.*|vb_.*|delete_.*|cmd.*|bytes_.*|item_count|curr_connections|ops_per_sec|disk_write_queue|mem_.*|cas_hits|ops|curr_items|cpu_utilization_rate|swap_used|disk_used|rest_requests|hibernated_waked|xdc_ops)))
+        sourceLabels:
+        - __name__
+    - remoteTimeout: 5s
+      url: http://$(FLUENTD_METRICS_SVC).$(NAMESPACE).svc.cluster.local.:9888/prometheus.metrics.applications.squidproxy
+      writeRelabelConfigs:
+      - action: keep
+        regex: (?:squid_(uptime|cache(Ip(Entries|Requests|Hits)|Fqdn(Entries|Requests|Misses|NegativeHits)|Dns(Requests|Replies|SvcTime5)|Sys(PageFaults|NumReads)|Current(FileDescrCnt|UnusedFDescrCnt|ResFileDescrCnt)|Server(Requests|InKb|OutKb)|Http(AllSvcTime5|Errors|InKb|OutKb|AllSvcTime1)|Mem(MaxSize|Usage)|NumObjCount|CpuTime|MaxResSize|ProtoClientHttpRequests|Clients)))
+        sourceLabels:
+        - __name__
+  securityContext:
+    fsGroup: 2000
+    runAsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+  ruleNamespaceSelector: {}
+  ruleSelector:
+    matchLabels:
+      app: kube-prometheus-stack
+      release: "arcade-fluentd"
+
+  podMetadata:
+    annotations: {}
+    labels: {}
+  additionalScrapeConfigs:
+    name: arcade-fluentd-kube-promet-prometheus-scrape-confg
+    key: additional-scrape-configs.yaml
+  containers:
+    - env:
+      - name: FLUENTD_METRICS_SVC
+        valueFrom:
+          configMapKeyRef:
+            key: fluentdMetrics
+            name: sumologic-configmap
+      - name: NAMESPACE
+        valueFrom:
+          configMapKeyRef:
+            key: fluentdNamespace
+            name: sumologic-configmap
+      name: config-reloader
+  thanos:
+    resources:
+      limits:
+        cpu: 10m
+        memory: 32Mi
+      requests:
+        cpu: 1m
+        memory: 8Mi
+    version: v0.25.2
+  portName: web
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/alertmanager.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-alertmanager.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: alertmanager.rules
+    rules:
+    - alert: AlertmanagerConfigInconsistent
+      annotations:
+        message: 'The configuration of the instances of the Alertmanager cluster `{{ $labels.namespace }}/{{ $labels.service }}` are out of sync.
+
+          {{ range printf "alertmanager_config_hash{namespace=\"%s\",service=\"%s\"}" $labels.namespace $labels.service | query }}
+
+          Configuration hash for pod {{ .Labels.pod }} is "{{ printf "%.f" .Value }}"
+
+          {{ end }}
+
+          '
+      expr: count by(namespace,service) (count_values by(namespace,service) ("config_hash", alertmanager_config_hash{job="arcade-fluentd-kube-promet-alertmanager",namespace="fluentd"})) != 1
+      for: 5m
+      labels:
+        severity: critical
+    - alert: AlertmanagerFailedReload
+      annotations:
+        message: Reloading Alertmanager's configuration has failed for {{ $labels.namespace }}/{{ $labels.pod}}.
+      expr: alertmanager_config_last_reload_successful{job="arcade-fluentd-kube-promet-alertmanager",namespace="fluentd"} == 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: AlertmanagerMembersInconsistent
+      annotations:
+        message: Alertmanager has not found all other members of the cluster.
+      expr: |-
+        alertmanager_cluster_members{job="arcade-fluentd-kube-promet-alertmanager",namespace="fluentd"}
+          != on (service) GROUP_LEFT()
+        count by (service) (alertmanager_cluster_members{job="arcade-fluentd-kube-promet-alertmanager",namespace="fluentd"})
+      for: 5m
+      labels:
+        severity: critical
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/etcd.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-etcd
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: etcd
+    rules:
+    - alert: etcdMembersDown
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": members are down ({{ $value }}).'
+      expr: |-
+        max by (job) (
+          sum by (job) (up{job=~".*etcd.*"} == bool 0)
+        or
+          count by (job,endpoint) (
+            sum by (job,endpoint,To) (rate(etcd_network_peer_sent_failures_total{job=~".*etcd.*"}[3m])) > 0.01
+          )
+        )
+        > 0
+      for: 3m
+      labels:
+        severity: critical
+    - alert: etcdInsufficientMembers
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": insufficient members ({{ $value }}).'
+      expr: sum(up{job=~".*etcd.*"} == bool 1) by (job) < ((count(up{job=~".*etcd.*"}) by (job) + 1) / 2)
+      for: 3m
+      labels:
+        severity: critical
+    - alert: etcdNoLeader
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": member {{ $labels.instance }} has no leader.'
+      expr: etcd_server_has_leader{job=~".*etcd.*"} == 0
+      for: 1m
+      labels:
+        severity: critical
+    - alert: etcdHighNumberOfLeaderChanges
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": {{ $value }} leader changes within the last 15 minutes. Frequent elections may be a sign of insufficient resources, high network latency, or disruptions by other components and should be investigated.'
+      expr: increase((max by (job) (etcd_server_leader_changes_seen_total{job=~".*etcd.*"}) or 0*absent(etcd_server_leader_changes_seen_total{job=~".*etcd.*"}))[15m:1m]) >= 3
+      for: 5m
+      labels:
+        severity: warning
+    - alert: etcdHighNumberOfFailedGRPCRequests
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": {{ $value }}% of requests for {{ $labels.grpc_method }} failed on etcd instance {{ $labels.instance }}.'
+      expr: |-
+        100 * sum(rate(grpc_server_handled_total{job=~".*etcd.*", grpc_code!="OK"}[5m])) BY (job, instance, grpc_service, grpc_method)
+          /
+        sum(rate(grpc_server_handled_total{job=~".*etcd.*"}[5m])) BY (job, instance, grpc_service, grpc_method)
+          > 1
+      for: 10m
+      labels:
+        severity: warning
+    - alert: etcdHighNumberOfFailedGRPCRequests
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": {{ $value }}% of requests for {{ $labels.grpc_method }} failed on etcd instance {{ $labels.instance }}.'
+      expr: |-
+        100 * sum(rate(grpc_server_handled_total{job=~".*etcd.*", grpc_code!="OK"}[5m])) BY (job, instance, grpc_service, grpc_method)
+          /
+        sum(rate(grpc_server_handled_total{job=~".*etcd.*"}[5m])) BY (job, instance, grpc_service, grpc_method)
+          > 5
+      for: 5m
+      labels:
+        severity: critical
+    - alert: etcdGRPCRequestsSlow
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": gRPC requests to {{ $labels.grpc_method }} are taking {{ $value }}s on etcd instance {{ $labels.instance }}.'
+      expr: |-
+        histogram_quantile(0.99, sum(rate(grpc_server_handling_seconds_bucket{job=~".*etcd.*", grpc_type="unary"}[5m])) by (job, instance, grpc_service, grpc_method, le))
+        > 0.15
+      for: 10m
+      labels:
+        severity: critical
+    - alert: etcdMemberCommunicationSlow
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": member communication with {{ $labels.To }} is taking {{ $value }}s on etcd instance {{ $labels.instance }}.'
+      expr: |-
+        histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket{job=~".*etcd.*"}[5m]))
+        > 0.15
+      for: 10m
+      labels:
+        severity: warning
+    - alert: etcdHighNumberOfFailedProposals
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": {{ $value }} proposal failures within the last 30 minutes on etcd instance {{ $labels.instance }}.'
+      expr: rate(etcd_server_proposals_failed_total{job=~".*etcd.*"}[15m]) > 5
+      for: 15m
+      labels:
+        severity: warning
+    - alert: etcdHighFsyncDurations
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": 99th percentile fync durations are {{ $value }}s on etcd instance {{ $labels.instance }}.'
+      expr: |-
+        histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job=~".*etcd.*"}[5m]))
+        > 0.5
+      for: 10m
+      labels:
+        severity: warning
+    - alert: etcdHighCommitDurations
+      annotations:
+        message: 'etcd cluster "{{ $labels.job }}": 99th percentile commit durations {{ $value }}s on etcd instance {{ $labels.instance }}.'
+      expr: |-
+        histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[5m]))
+        > 0.25
+      for: 10m
+      labels:
+        severity: warning
+    - alert: etcdHighNumberOfFailedHTTPRequests
+      annotations:
+        message: '{{ $value }}% of requests for {{ $labels.method }} failed on etcd instance {{ $labels.instance }}'
+      expr: |-
+        sum(rate(etcd_http_failed_total{job=~".*etcd.*", code!="404"}[5m])) BY (method) / sum(rate(etcd_http_received_total{job=~".*etcd.*"}[5m]))
+        BY (method) > 0.01
+      for: 10m
+      labels:
+        severity: warning
+    - alert: etcdHighNumberOfFailedHTTPRequests
+      annotations:
+        message: '{{ $value }}% of requests for {{ $labels.method }} failed on etcd instance {{ $labels.instance }}.'
+      expr: |-
+        sum(rate(etcd_http_failed_total{job=~".*etcd.*", code!="404"}[5m])) BY (method) / sum(rate(etcd_http_received_total{job=~".*etcd.*"}[5m]))
+        BY (method) > 0.05
+      for: 10m
+      labels:
+        severity: critical
+    - alert: etcdHTTPRequestsSlow
+      annotations:
+        message: etcd instance {{ $labels.instance }} HTTP requests to {{ $labels.method }} are slow.
+      expr: |-
+        histogram_quantile(0.99, rate(etcd_http_successful_duration_seconds_bucket[5m]))
+        > 0.15
+      for: 10m
+      labels:
+        severity: warning
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/general.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-general.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: general.rules
+    rules:
+    - alert: TargetDown
+      annotations:
+        message: '{{ printf "%.4g" $value }}% of the {{ $labels.job }}/{{ $labels.service }} targets in {{ $labels.namespace }} namespace are down.'
+      expr: 100 * (count(up == 0) BY (job, namespace, service) / count(up) BY (job, namespace, service)) > 10
+      for: 10m
+      labels:
+        severity: warning
+    - alert: Watchdog
+      annotations:
+        message: 'This is an alert meant to ensure that the entire alerting pipeline is functional.
+
+          This alert is always firing, therefore it should always be firing in Alertmanager
+
+          and always fire against a receiver. There are integrations with various notification
+
+          mechanisms that send a notification when this alert is not firing. For example the
+
+          "DeadMansSnitch" integration in PagerDuty.
+
+          '
+      expr: vector(1)
+      labels:
+        severity: none
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/k8s.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-k8s.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: k8s.rules
+    rules:
+    - expr: sum(rate(container_cpu_usage_seconds_total{job="kubelet", metrics_path="/metrics/cadvisor", image!="", container!="POD"}[5m])) by (namespace)
+      record: namespace:container_cpu_usage_seconds_total:sum_rate
+    - expr: |-
+        sum by (cluster, namespace, pod, container) (
+          rate(container_cpu_usage_seconds_total{job="kubelet", metrics_path="/metrics/cadvisor", image!="", container!="POD"}[5m])
+        ) * on (cluster, namespace, pod) group_left(node) topk by (cluster, namespace, pod) (
+          1, max by(cluster, namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate
+    - expr: |-
+        container_memory_working_set_bytes{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+        * on (namespace, pod) group_left(node) topk by(namespace, pod) (1,
+          max by(namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_memory_working_set_bytes
+    - expr: |-
+        container_memory_rss{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+        * on (namespace, pod) group_left(node) topk by(namespace, pod) (1,
+          max by(namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_memory_rss
+    - expr: |-
+        container_memory_cache{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+        * on (namespace, pod) group_left(node) topk by(namespace, pod) (1,
+          max by(namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_memory_cache
+    - expr: |-
+        container_memory_swap{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+        * on (namespace, pod) group_left(node) topk by(namespace, pod) (1,
+          max by(namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_memory_swap
+    - expr: sum(container_memory_usage_bytes{job="kubelet", metrics_path="/metrics/cadvisor", image!="", container!="POD"}) by (namespace)
+      record: namespace:container_memory_usage_bytes:sum
+    - expr: |-
+        sum by (namespace) (
+            sum by (namespace, pod) (
+                max by (namespace, pod, container) (
+                    kube_pod_container_resource_requests_memory_bytes{job="kube-state-metrics"}
+                ) * on(namespace, pod) group_left() max by (namespace, pod) (
+                    kube_pod_status_phase{phase=~"Pending|Running"} == 1
+                )
+            )
+        )
+      record: namespace:kube_pod_container_resource_requests_memory_bytes:sum
+    - expr: |-
+        sum by (namespace) (
+            sum by (namespace, pod) (
+                max by (namespace, pod, container) (
+                    kube_pod_container_resource_requests_cpu_cores{job="kube-state-metrics"}
+                ) * on(namespace, pod) group_left() max by (namespace, pod) (
+                  kube_pod_status_phase{phase=~"Pending|Running"} == 1
+                )
+            )
+        )
+      record: namespace:kube_pod_container_resource_requests_cpu_cores:sum
+    - expr: |-
+        max by (cluster, namespace, workload, pod) (
+          label_replace(
+            label_replace(
+              kube_pod_owner{job="kube-state-metrics", owner_kind="ReplicaSet"},
+              "replicaset", "$1", "owner_name", "(.*)"
+            ) * on(replicaset, namespace) group_left(owner_name) topk by(replicaset, namespace) (
+              1, max by (replicaset, namespace, owner_name) (
+                kube_replicaset_owner{job="kube-state-metrics"}
+              )
+            ),
+            "workload", "$1", "owner_name", "(.*)"
+          )
+        )
+      labels:
+        workload_type: deployment
+      record: namespace_workload_pod:kube_pod_owner:relabel
+    - expr: |-
+        max by (cluster, namespace, workload, pod) (
+          label_replace(
+            kube_pod_owner{job="kube-state-metrics", owner_kind="DaemonSet"},
+            "workload", "$1", "owner_name", "(.*)"
+          )
+        )
+      labels:
+        workload_type: daemonset
+      record: namespace_workload_pod:kube_pod_owner:relabel
+    - expr: |-
+        max by (cluster, namespace, workload, pod) (
+          label_replace(
+            kube_pod_owner{job="kube-state-metrics", owner_kind="StatefulSet"},
+            "workload", "$1", "owner_name", "(.*)"
+          )
+        )
+      labels:
+        workload_type: statefulset
+      record: namespace_workload_pod:kube_pod_owner:relabel
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kube-apiserver-availability.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kube-apiserver-availability.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - interval: 3m
+    name: kube-apiserver-availability.rules
+    rules:
+    - expr: |-
+        1 - (
+          (
+            # write too slow
+            sum(increase(apiserver_request_duration_seconds_count{verb=~"POST|PUT|PATCH|DELETE"}[30d]))
+            -
+            sum(increase(apiserver_request_duration_seconds_bucket{verb=~"POST|PUT|PATCH|DELETE",le="1"}[30d]))
+          ) +
+          (
+            # read too slow
+            sum(increase(apiserver_request_duration_seconds_count{verb=~"LIST|GET"}[30d]))
+            -
+            (
+              (
+                sum(increase(apiserver_request_duration_seconds_bucket{verb=~"LIST|GET",scope=~"resource|",le="0.1"}[30d]))
+                or
+                vector(0)
+              )
+              +
+              sum(increase(apiserver_request_duration_seconds_bucket{verb=~"LIST|GET",scope="namespace",le="0.5"}[30d]))
+              +
+              sum(increase(apiserver_request_duration_seconds_bucket{verb=~"LIST|GET",scope="cluster",le="5"}[30d]))
+            )
+          ) +
+          # errors
+          sum(code:apiserver_request_total:increase30d{code=~"5.."} or vector(0))
+        )
+        /
+        sum(code:apiserver_request_total:increase30d)
+      labels:
+        verb: all
+      record: apiserver_request:availability30d
+    - expr: |-
+        1 - (
+          sum(increase(apiserver_request_duration_seconds_count{job="apiserver",verb=~"LIST|GET"}[30d]))
+          -
+          (
+            # too slow
+            (
+              sum(increase(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope=~"resource|",le="0.1"}[30d]))
+              or
+              vector(0)
+            )
+            +
+            sum(increase(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="namespace",le="0.5"}[30d]))
+            +
+            sum(increase(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="cluster",le="5"}[30d]))
+          )
+          +
+          # errors
+          sum(code:apiserver_request_total:increase30d{verb="read",code=~"5.."} or vector(0))
+        )
+        /
+        sum(code:apiserver_request_total:increase30d{verb="read"})
+      labels:
+        verb: read
+      record: apiserver_request:availability30d
+    - expr: |-
+        1 - (
+          (
+            # too slow
+            sum(increase(apiserver_request_duration_seconds_count{verb=~"POST|PUT|PATCH|DELETE"}[30d]))
+            -
+            sum(increase(apiserver_request_duration_seconds_bucket{verb=~"POST|PUT|PATCH|DELETE",le="1"}[30d]))
+          )
+          +
+          # errors
+          sum(code:apiserver_request_total:increase30d{verb="write",code=~"5.."} or vector(0))
+        )
+        /
+        sum(code:apiserver_request_total:increase30d{verb="write"})
+      labels:
+        verb: write
+      record: apiserver_request:availability30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="LIST",code=~"2.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="GET",code=~"2.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="POST",code=~"2.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="PUT",code=~"2.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="PATCH",code=~"2.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="DELETE",code=~"2.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="LIST",code=~"3.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="GET",code=~"3.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="POST",code=~"3.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="PUT",code=~"3.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="PATCH",code=~"3.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="DELETE",code=~"3.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="LIST",code=~"4.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="GET",code=~"4.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="POST",code=~"4.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="PUT",code=~"4.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="PATCH",code=~"4.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="DELETE",code=~"4.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="LIST",code=~"5.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="GET",code=~"5.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="POST",code=~"5.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="PUT",code=~"5.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="PATCH",code=~"5.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code, verb) (increase(apiserver_request_total{job="apiserver",verb="DELETE",code=~"5.."}[30d]))
+      record: code_verb:apiserver_request_total:increase30d
+    - expr: sum by (code) (code_verb:apiserver_request_total:increase30d{verb=~"LIST|GET"})
+      labels:
+        verb: read
+      record: code:apiserver_request_total:increase30d
+    - expr: sum by (code) (code_verb:apiserver_request_total:increase30d{verb=~"POST|PUT|PATCH|DELETE"})
+      labels:
+        verb: write
+      record: code:apiserver_request_total:increase30d
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kube-apiserver-slos.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kube-apiserver-slos
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kube-apiserver-slos
+    rules:
+    - alert: KubeAPIErrorBudgetBurn
+      annotations:
+        description: The API server is burning too much error budget.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn
+        summary: The API server is burning too much error budget.
+      expr: |-
+        sum(apiserver_request:burnrate1h) > (14.40 * 0.01000)
+        and
+        sum(apiserver_request:burnrate5m) > (14.40 * 0.01000)
+      for: 2m
+      labels:
+        long: 1h
+        severity: critical
+        short: 5m
+    - alert: KubeAPIErrorBudgetBurn
+      annotations:
+        description: The API server is burning too much error budget.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn
+        summary: The API server is burning too much error budget.
+      expr: |-
+        sum(apiserver_request:burnrate6h) > (6.00 * 0.01000)
+        and
+        sum(apiserver_request:burnrate30m) > (6.00 * 0.01000)
+      for: 15m
+      labels:
+        long: 6h
+        severity: critical
+        short: 30m
+    - alert: KubeAPIErrorBudgetBurn
+      annotations:
+        description: The API server is burning too much error budget.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn
+        summary: The API server is burning too much error budget.
+      expr: |-
+        sum(apiserver_request:burnrate1d) > (3.00 * 0.01000)
+        and
+        sum(apiserver_request:burnrate2h) > (3.00 * 0.01000)
+      for: 1h
+      labels:
+        long: 1d
+        severity: warning
+        short: 2h
+    - alert: KubeAPIErrorBudgetBurn
+      annotations:
+        description: The API server is burning too much error budget.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn
+        summary: The API server is burning too much error budget.
+      expr: |-
+        sum(apiserver_request:burnrate3d) > (1.00 * 0.01000)
+        and
+        sum(apiserver_request:burnrate6h) > (1.00 * 0.01000)
+      for: 3h
+      labels:
+        long: 3d
+        severity: warning
+        short: 6h
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kube-apiserver.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kube-apiserver.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kube-apiserver.rules
+    rules:
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"LIST|GET"}[1d]))
+            -
+            (
+              (
+                sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope=~"resource|",le="0.1"}[1d]))
+                or
+                vector(0)
+              )
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="namespace",le="0.5"}[1d]))
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="cluster",le="5"}[1d]))
+            )
+          )
+          +
+          # errors
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET",code=~"5.."}[1d]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET"}[1d]))
+      labels:
+        verb: read
+      record: apiserver_request:burnrate1d
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"LIST|GET"}[1h]))
+            -
+            (
+              (
+                sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope=~"resource|",le="0.1"}[1h]))
+                or
+                vector(0)
+              )
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="namespace",le="0.5"}[1h]))
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="cluster",le="5"}[1h]))
+            )
+          )
+          +
+          # errors
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET",code=~"5.."}[1h]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET"}[1h]))
+      labels:
+        verb: read
+      record: apiserver_request:burnrate1h
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"LIST|GET"}[2h]))
+            -
+            (
+              (
+                sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope=~"resource|",le="0.1"}[2h]))
+                or
+                vector(0)
+              )
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="namespace",le="0.5"}[2h]))
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="cluster",le="5"}[2h]))
+            )
+          )
+          +
+          # errors
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET",code=~"5.."}[2h]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET"}[2h]))
+      labels:
+        verb: read
+      record: apiserver_request:burnrate2h
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"LIST|GET"}[30m]))
+            -
+            (
+              (
+                sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope=~"resource|",le="0.1"}[30m]))
+                or
+                vector(0)
+              )
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="namespace",le="0.5"}[30m]))
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="cluster",le="5"}[30m]))
+            )
+          )
+          +
+          # errors
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET",code=~"5.."}[30m]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET"}[30m]))
+      labels:
+        verb: read
+      record: apiserver_request:burnrate30m
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"LIST|GET"}[3d]))
+            -
+            (
+              (
+                sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope=~"resource|",le="0.1"}[3d]))
+                or
+                vector(0)
+              )
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="namespace",le="0.5"}[3d]))
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="cluster",le="5"}[3d]))
+            )
+          )
+          +
+          # errors
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET",code=~"5.."}[3d]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET"}[3d]))
+      labels:
+        verb: read
+      record: apiserver_request:burnrate3d
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"LIST|GET"}[5m]))
+            -
+            (
+              (
+                sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope=~"resource|",le="0.1"}[5m]))
+                or
+                vector(0)
+              )
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="namespace",le="0.5"}[5m]))
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="cluster",le="5"}[5m]))
+            )
+          )
+          +
+          # errors
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET",code=~"5.."}[5m]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET"}[5m]))
+      labels:
+        verb: read
+      record: apiserver_request:burnrate5m
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"LIST|GET"}[6h]))
+            -
+            (
+              (
+                sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope=~"resource|",le="0.1"}[6h]))
+                or
+                vector(0)
+              )
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="namespace",le="0.5"}[6h]))
+              +
+              sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",scope="cluster",le="5"}[6h]))
+            )
+          )
+          +
+          # errors
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET",code=~"5.."}[6h]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET"}[6h]))
+      labels:
+        verb: read
+      record: apiserver_request:burnrate6h
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[1d]))
+            -
+            sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",le="1"}[1d]))
+          )
+          +
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",code=~"5.."}[1d]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[1d]))
+      labels:
+        verb: write
+      record: apiserver_request:burnrate1d
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[1h]))
+            -
+            sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",le="1"}[1h]))
+          )
+          +
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",code=~"5.."}[1h]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[1h]))
+      labels:
+        verb: write
+      record: apiserver_request:burnrate1h
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[2h]))
+            -
+            sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",le="1"}[2h]))
+          )
+          +
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",code=~"5.."}[2h]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[2h]))
+      labels:
+        verb: write
+      record: apiserver_request:burnrate2h
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[30m]))
+            -
+            sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",le="1"}[30m]))
+          )
+          +
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",code=~"5.."}[30m]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[30m]))
+      labels:
+        verb: write
+      record: apiserver_request:burnrate30m
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[3d]))
+            -
+            sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",le="1"}[3d]))
+          )
+          +
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",code=~"5.."}[3d]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[3d]))
+      labels:
+        verb: write
+      record: apiserver_request:burnrate3d
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[5m]))
+            -
+            sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",le="1"}[5m]))
+          )
+          +
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",code=~"5.."}[5m]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[5m]))
+      labels:
+        verb: write
+      record: apiserver_request:burnrate5m
+    - expr: |-
+        (
+          (
+            # too slow
+            sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[6h]))
+            -
+            sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",le="1"}[6h]))
+          )
+          +
+          sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",code=~"5.."}[6h]))
+        )
+        /
+        sum(rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[6h]))
+      labels:
+        verb: write
+      record: apiserver_request:burnrate6h
+    - expr: sum by (code,resource) (rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET"}[5m]))
+      labels:
+        verb: read
+      record: code_resource:apiserver_request_total:rate5m
+    - expr: sum by (code,resource) (rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[5m]))
+      labels:
+        verb: write
+      record: code_resource:apiserver_request_total:rate5m
+    - expr: histogram_quantile(0.99, sum by (le, resource) (rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET"}[5m]))) > 0
+      labels:
+        quantile: '0.99'
+        verb: read
+      record: cluster_quantile:apiserver_request_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.99, sum by (le, resource) (rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[5m]))) > 0
+      labels:
+        quantile: '0.99'
+        verb: write
+      record: cluster_quantile:apiserver_request_duration_seconds:histogram_quantile
+    - expr: |-
+        sum(rate(apiserver_request_duration_seconds_sum{subresource!="log",verb!~"LIST|WATCH|WATCHLIST|DELETECOLLECTION|PROXY|CONNECT"}[5m])) without(instance, pod)
+        /
+        sum(rate(apiserver_request_duration_seconds_count{subresource!="log",verb!~"LIST|WATCH|WATCHLIST|DELETECOLLECTION|PROXY|CONNECT"}[5m])) without(instance, pod)
+      record: cluster:apiserver_request_duration_seconds:mean5m
+    - expr: histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",subresource!="log",verb!~"LIST|WATCH|WATCHLIST|DELETECOLLECTION|PROXY|CONNECT"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.99'
+      record: cluster_quantile:apiserver_request_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.9, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",subresource!="log",verb!~"LIST|WATCH|WATCHLIST|DELETECOLLECTION|PROXY|CONNECT"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.9'
+      record: cluster_quantile:apiserver_request_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.5, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",subresource!="log",verb!~"LIST|WATCH|WATCHLIST|DELETECOLLECTION|PROXY|CONNECT"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.5'
+      record: cluster_quantile:apiserver_request_duration_seconds:histogram_quantile
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kube-prometheus-general.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kube-prometheus-general.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kube-prometheus-general.rules
+    rules:
+    - expr: count without(instance, pod, node) (up == 1)
+      record: count:up1
+    - expr: count without(instance, pod, node) (up == 0)
+      record: count:up0
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kube-prometheus-node-recording.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kube-prometheus-node-recording.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kube-prometheus-node-recording.rules
+    rules:
+    - expr: sum(rate(node_cpu_seconds_total{mode!="idle",mode!="iowait",mode!="steal"}[3m])) BY (instance)
+      record: instance:node_cpu:rate:sum
+    - expr: sum(rate(node_network_receive_bytes_total[3m])) BY (instance)
+      record: instance:node_network_receive_bytes:rate:sum
+    - expr: sum(rate(node_network_transmit_bytes_total[3m])) BY (instance)
+      record: instance:node_network_transmit_bytes:rate:sum
+    - expr: sum(rate(node_cpu_seconds_total{mode!="idle",mode!="iowait",mode!="steal"}[5m])) WITHOUT (cpu, mode) / ON(instance) GROUP_LEFT() count(sum(node_cpu_seconds_total) BY (instance, cpu)) BY (instance)
+      record: instance:node_cpu:ratio
+    - expr: sum(rate(node_cpu_seconds_total{mode!="idle",mode!="iowait",mode!="steal"}[5m]))
+      record: cluster:node_cpu:sum_rate5m
+    - expr: cluster:node_cpu_seconds_total:rate5m / count(sum(node_cpu_seconds_total) BY (instance, cpu))
+      record: cluster:node_cpu:ratio
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kube-scheduler.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kube-scheduler.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kube-scheduler.rules
+    rules:
+    - expr: histogram_quantile(0.99, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{job="kube-scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.99'
+      record: cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.99, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{job="kube-scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.99'
+      record: cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.99, sum(rate(scheduler_binding_duration_seconds_bucket{job="kube-scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.99'
+      record: cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.9, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{job="kube-scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.9'
+      record: cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.9, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{job="kube-scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.9'
+      record: cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.9, sum(rate(scheduler_binding_duration_seconds_bucket{job="kube-scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.9'
+      record: cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.5, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{job="kube-scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.5'
+      record: cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.5, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{job="kube-scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.5'
+      record: cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.5, sum(rate(scheduler_binding_duration_seconds_bucket{job="kube-scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: '0.5'
+      record: cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kube-state-metrics.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kube-state-metrics
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kube-state-metrics
+    rules:
+    - alert: KubeStateMetricsListErrors
+      annotations:
+        description: kube-state-metrics is experiencing errors at an elevated rate in list operations. This is likely causing it to not be able to expose metrics about Kubernetes objects correctly or at all.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatemetricslisterrors
+        summary: kube-state-metrics is experiencing errors in list operations.
+      expr: |-
+        (sum(rate(kube_state_metrics_list_total{job="kube-state-metrics",result="error"}[5m]))
+          /
+        sum(rate(kube_state_metrics_list_total{job="kube-state-metrics"}[5m])))
+        > 0.01
+      for: 15m
+      labels:
+        severity: critical
+    - alert: KubeStateMetricsWatchErrors
+      annotations:
+        description: kube-state-metrics is experiencing errors at an elevated rate in watch operations. This is likely causing it to not be able to expose metrics about Kubernetes objects correctly or at all.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatemetricswatcherrors
+        summary: kube-state-metrics is experiencing errors in watch operations.
+      expr: |-
+        (sum(rate(kube_state_metrics_watch_total{job="kube-state-metrics",result="error"}[5m]))
+          /
+        sum(rate(kube_state_metrics_watch_total{job="kube-state-metrics"}[5m])))
+        > 0.01
+      for: 15m
+      labels:
+        severity: critical
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubelet.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kubelet.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kubelet.rules
+    rules:
+    - expr: histogram_quantile(0.99, sum(rate(kubelet_pleg_relist_duration_seconds_bucket[5m])) by (instance, le) * on(instance) group_left(node) kubelet_node_name{job="kubelet", metrics_path="/metrics"})
+      labels:
+        quantile: '0.99'
+      record: node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.9, sum(rate(kubelet_pleg_relist_duration_seconds_bucket[5m])) by (instance, le) * on(instance) group_left(node) kubelet_node_name{job="kubelet", metrics_path="/metrics"})
+      labels:
+        quantile: '0.9'
+      record: node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile
+    - expr: histogram_quantile(0.5, sum(rate(kubelet_pleg_relist_duration_seconds_bucket[5m])) by (instance, le) * on(instance) group_left(node) kubelet_node_name{job="kubelet", metrics_path="/metrics"})
+      labels:
+        quantile: '0.5'
+      record: node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubernetes-apps.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kubernetes-apps
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kubernetes-apps
+    rules:
+    - alert: KubePodCrashLooping
+      annotations:
+        description: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is restarting {{ printf "%.2f" $value }} times / 5 minutes.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodcrashlooping
+        summary: Pod is crash looping.
+      expr: rate(kube_pod_container_status_restarts_total{job="kube-state-metrics", namespace=~".*"}[5m]) * 60 * 5 > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubePodNotReady
+      annotations:
+        description: Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready state for longer than 15 minutes.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodnotready
+        summary: Pod has been in a non-ready state for more than 15 minutes.
+      expr: |-
+        sum by (namespace, pod) (
+          max by(namespace, pod) (
+            kube_pod_status_phase{job="kube-state-metrics", namespace=~".*", phase=~"Pending|Unknown"}
+          ) * on(namespace, pod) group_left(owner_kind) topk by(namespace, pod) (
+            1, max by(namespace, pod, owner_kind) (kube_pod_owner{owner_kind!="Job"})
+          )
+        ) > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeDeploymentGenerationMismatch
+      annotations:
+        description: Deployment generation for {{ $labels.namespace }}/{{ $labels.deployment }} does not match, this indicates that the Deployment has failed but has not been rolled back.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedeploymentgenerationmismatch
+        summary: Deployment generation mismatch due to possible roll-back
+      expr: |-
+        kube_deployment_status_observed_generation{job="kube-state-metrics", namespace=~".*"}
+          !=
+        kube_deployment_metadata_generation{job="kube-state-metrics", namespace=~".*"}
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeDeploymentReplicasMismatch
+      annotations:
+        description: Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has not matched the expected number of replicas for longer than 15 minutes.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedeploymentreplicasmismatch
+        summary: Deployment has not matched the expected number of replicas.
+      expr: |-
+        (
+          kube_deployment_spec_replicas{job="kube-state-metrics", namespace=~".*"}
+            !=
+          kube_deployment_status_replicas_available{job="kube-state-metrics", namespace=~".*"}
+        ) and (
+          changes(kube_deployment_status_replicas_updated{job="kube-state-metrics", namespace=~".*"}[5m])
+            ==
+          0
+        )
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeStatefulSetReplicasMismatch
+      annotations:
+        description: StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }} has not matched the expected number of replicas for longer than 15 minutes.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatefulsetreplicasmismatch
+        summary: Deployment has not matched the expected number of replicas.
+      expr: |-
+        (
+          kube_statefulset_status_replicas_ready{job="kube-state-metrics", namespace=~".*"}
+            !=
+          kube_statefulset_status_replicas{job="kube-state-metrics", namespace=~".*"}
+        ) and (
+          changes(kube_statefulset_status_replicas_updated{job="kube-state-metrics", namespace=~".*"}[5m])
+            ==
+          0
+        )
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeStatefulSetGenerationMismatch
+      annotations:
+        description: StatefulSet generation for {{ $labels.namespace }}/{{ $labels.statefulset }} does not match, this indicates that the StatefulSet has failed but has not been rolled back.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatefulsetgenerationmismatch
+        summary: StatefulSet generation mismatch due to possible roll-back
+      expr: |-
+        kube_statefulset_status_observed_generation{job="kube-state-metrics", namespace=~".*"}
+          !=
+        kube_statefulset_metadata_generation{job="kube-state-metrics", namespace=~".*"}
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeStatefulSetUpdateNotRolledOut
+      annotations:
+        description: StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }} update has not been rolled out.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatefulsetupdatenotrolledout
+        summary: StatefulSet update has not been rolled out.
+      expr: |-
+        (
+          max without (revision) (
+            kube_statefulset_status_current_revision{job="kube-state-metrics", namespace=~".*"}
+              unless
+            kube_statefulset_status_update_revision{job="kube-state-metrics", namespace=~".*"}
+          )
+            *
+          (
+            kube_statefulset_replicas{job="kube-state-metrics", namespace=~".*"}
+              !=
+            kube_statefulset_status_replicas_updated{job="kube-state-metrics", namespace=~".*"}
+          )
+        )  and (
+          changes(kube_statefulset_status_replicas_updated{job="kube-state-metrics", namespace=~".*"}[5m])
+            ==
+          0
+        )
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeDaemonSetRolloutStuck
+      annotations:
+        description: DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} has not finished or progressed for at least 15 minutes.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedaemonsetrolloutstuck
+        summary: DaemonSet rollout is stuck.
+      expr: |-
+        (
+          (
+            kube_daemonset_status_current_number_scheduled{job="kube-state-metrics", namespace=~".*"}
+             !=
+            kube_daemonset_status_desired_number_scheduled{job="kube-state-metrics", namespace=~".*"}
+          ) or (
+            kube_daemonset_status_number_misscheduled{job="kube-state-metrics", namespace=~".*"}
+             !=
+            0
+          ) or (
+            kube_daemonset_updated_number_scheduled{job="kube-state-metrics", namespace=~".*"}
+             !=
+            kube_daemonset_status_desired_number_scheduled{job="kube-state-metrics", namespace=~".*"}
+          ) or (
+            kube_daemonset_status_number_available{job="kube-state-metrics", namespace=~".*"}
+             !=
+            kube_daemonset_status_desired_number_scheduled{job="kube-state-metrics", namespace=~".*"}
+          )
+        ) and (
+          changes(kube_daemonset_updated_number_scheduled{job="kube-state-metrics", namespace=~".*"}[5m])
+            ==
+          0
+        )
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeContainerWaiting
+      annotations:
+        description: Pod {{ $labels.namespace }}/{{ $labels.pod }} container {{ $labels.container}} has been in waiting state for longer than 1 hour.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecontainerwaiting
+        summary: Pod container waiting longer than 1 hour
+      expr: sum by (namespace, pod, container) (kube_pod_container_status_waiting_reason{job="kube-state-metrics", namespace=~".*"}) > 0
+      for: 1h
+      labels:
+        severity: warning
+    - alert: KubeDaemonSetNotScheduled
+      annotations:
+        description: '{{ $value }} Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} are not scheduled.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedaemonsetnotscheduled
+        summary: DaemonSet pods are not scheduled.
+      expr: |-
+        kube_daemonset_status_desired_number_scheduled{job="kube-state-metrics", namespace=~".*"}
+          -
+        kube_daemonset_status_current_number_scheduled{job="kube-state-metrics", namespace=~".*"} > 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: KubeDaemonSetMisScheduled
+      annotations:
+        description: '{{ $value }} Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} are running where they are not supposed to run.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedaemonsetmisscheduled
+        summary: DaemonSet pods are misscheduled.
+      expr: kube_daemonset_status_number_misscheduled{job="kube-state-metrics", namespace=~".*"} > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeJobCompletion
+      annotations:
+        description: Job {{ $labels.namespace }}/{{ $labels.job_name }} is taking more than 12 hours to complete.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubejobcompletion
+        summary: Job did not complete in time
+      expr: kube_job_spec_completions{job="kube-state-metrics", namespace=~".*"} - kube_job_status_succeeded{job="kube-state-metrics", namespace=~".*"}  > 0
+      for: 12h
+      labels:
+        severity: warning
+    - alert: KubeJobFailed
+      annotations:
+        description: Job {{ $labels.namespace }}/{{ $labels.job_name }} failed to complete. Removing failed job after investigation should clear this alert.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubejobfailed
+        summary: Job failed to complete.
+      expr: kube_job_failed{job="kube-state-metrics", namespace=~".*"}  > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeHpaReplicasMismatch
+      annotations:
+        description: HPA {{ $labels.namespace }}/{{ $labels.hpa }} has not matched the desired number of replicas for longer than 15 minutes.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubehpareplicasmismatch
+        summary: HPA has not matched descired number of replicas.
+      expr: |-
+        (kube_hpa_status_desired_replicas{job="kube-state-metrics", namespace=~".*"}
+          !=
+        kube_hpa_status_current_replicas{job="kube-state-metrics", namespace=~".*"})
+          and
+        (kube_hpa_status_current_replicas{job="kube-state-metrics", namespace=~".*"}
+          >
+        kube_hpa_spec_min_replicas{job="kube-state-metrics", namespace=~".*"})
+          and
+        (kube_hpa_status_current_replicas{job="kube-state-metrics", namespace=~".*"}
+          <
+        kube_hpa_spec_max_replicas{job="kube-state-metrics", namespace=~".*"})
+          and
+        changes(kube_hpa_status_current_replicas[15m]) == 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeHpaMaxedOut
+      annotations:
+        description: HPA {{ $labels.namespace }}/{{ $labels.hpa }} has been running at max replicas for longer than 15 minutes.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubehpamaxedout
+        summary: HPA is running at max replicas
+      expr: |-
+        kube_hpa_status_current_replicas{job="kube-state-metrics", namespace=~".*"}
+          ==
+        kube_hpa_spec_max_replicas{job="kube-state-metrics", namespace=~".*"}
+      for: 15m
+      labels:
+        severity: warning
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubernetes-resources.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kubernetes-resources
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kubernetes-resources
+    rules:
+    - alert: KubeCPUOvercommit
+      annotations:
+        description: Cluster has overcommitted CPU resource requests for Pods and cannot tolerate node failure.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecpuovercommit
+        summary: Cluster has overcommitted CPU resource requests.
+      expr: |-
+        sum(namespace:kube_pod_container_resource_requests_cpu_cores:sum{})
+          /
+        sum(kube_node_status_allocatable_cpu_cores)
+          >
+        (count(kube_node_status_allocatable_cpu_cores)-1) / count(kube_node_status_allocatable_cpu_cores)
+      for: 5m
+      labels:
+        severity: warning
+    - alert: KubeMemoryOvercommit
+      annotations:
+        description: Cluster has overcommitted memory resource requests for Pods and cannot tolerate node failure.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubememoryovercommit
+        summary: Cluster has overcommitted memory resource requests.
+      expr: |-
+        sum(namespace:kube_pod_container_resource_requests_memory_bytes:sum{})
+          /
+        sum(kube_node_status_allocatable_memory_bytes)
+          >
+        (count(kube_node_status_allocatable_memory_bytes)-1)
+          /
+        count(kube_node_status_allocatable_memory_bytes)
+      for: 5m
+      labels:
+        severity: warning
+    - alert: KubeCPUQuotaOvercommit
+      annotations:
+        description: Cluster has overcommitted CPU resource requests for Namespaces.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecpuquotaovercommit
+        summary: Cluster has overcommitted CPU resource requests.
+      expr: |-
+        sum(kube_resourcequota{job="kube-state-metrics", type="hard", resource="cpu"})
+          /
+        sum(kube_node_status_allocatable_cpu_cores)
+          > 1.5
+      for: 5m
+      labels:
+        severity: warning
+    - alert: KubeMemoryQuotaOvercommit
+      annotations:
+        description: Cluster has overcommitted memory resource requests for Namespaces.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubememoryquotaovercommit
+        summary: Cluster has overcommitted memory resource requests.
+      expr: |-
+        sum(kube_resourcequota{job="kube-state-metrics", type="hard", resource="memory"})
+          /
+        sum(kube_node_status_allocatable_memory_bytes{job="kube-state-metrics"})
+          > 1.5
+      for: 5m
+      labels:
+        severity: warning
+    - alert: KubeQuotaAlmostFull
+      annotations:
+        description: Namespace {{ $labels.namespace }} is using {{ $value | humanizePercentage }} of its {{ $labels.resource }} quota.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubequotaalmostfull
+        summary: Namespace quota is going to be full.
+      expr: |-
+        kube_resourcequota{job="kube-state-metrics", type="used"}
+          / ignoring(instance, job, type)
+        (kube_resourcequota{job="kube-state-metrics", type="hard"} > 0)
+          > 0.9 < 1
+      for: 15m
+      labels:
+        severity: info
+    - alert: KubeQuotaFullyUsed
+      annotations:
+        description: Namespace {{ $labels.namespace }} is using {{ $value | humanizePercentage }} of its {{ $labels.resource }} quota.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubequotafullyused
+        summary: Namespace quota is fully used.
+      expr: |-
+        kube_resourcequota{job="kube-state-metrics", type="used"}
+          / ignoring(instance, job, type)
+        (kube_resourcequota{job="kube-state-metrics", type="hard"} > 0)
+          == 1
+      for: 15m
+      labels:
+        severity: info
+    - alert: KubeQuotaExceeded
+      annotations:
+        description: Namespace {{ $labels.namespace }} is using {{ $value | humanizePercentage }} of its {{ $labels.resource }} quota.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubequotaexceeded
+        summary: Namespace quota has exceeded the limits.
+      expr: |-
+        kube_resourcequota{job="kube-state-metrics", type="used"}
+          / ignoring(instance, job, type)
+        (kube_resourcequota{job="kube-state-metrics", type="hard"} > 0)
+          > 1
+      for: 15m
+      labels:
+        severity: warning
+    - alert: CPUThrottlingHigh
+      annotations:
+        description: '{{ $value | humanizePercentage }} throttling of CPU in namespace {{ $labels.namespace }} for container {{ $labels.container }} in pod {{ $labels.pod }}.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-cputhrottlinghigh
+        summary: Processes experience elevated CPU throttling.
+      expr: |-
+        sum(increase(container_cpu_cfs_throttled_periods_total{container!="", }[5m])) by (container, pod, namespace)
+          /
+        sum(increase(container_cpu_cfs_periods_total{}[5m])) by (container, pod, namespace)
+          > ( 25 / 100 )
+      for: 15m
+      labels:
+        severity: info
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubernetes-storage.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kubernetes-storage
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kubernetes-storage
+    rules:
+    - alert: KubePersistentVolumeFillingUp
+      annotations:
+        description: The PersistentVolume claimed by {{ $labels.persistentvolumeclaim }} in Namespace {{ $labels.namespace }} is only {{ $value | humanizePercentage }} free.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumefillingup
+        summary: PersistentVolume is filling up.
+      expr: |-
+        kubelet_volume_stats_available_bytes{job="kubelet", namespace=~".*", metrics_path="/metrics"}
+          /
+        kubelet_volume_stats_capacity_bytes{job="kubelet", namespace=~".*", metrics_path="/metrics"}
+          < 0.03
+      for: 1m
+      labels:
+        severity: critical
+    - alert: KubePersistentVolumeFillingUp
+      annotations:
+        description: Based on recent sampling, the PersistentVolume claimed by {{ $labels.persistentvolumeclaim }} in Namespace {{ $labels.namespace }} is expected to fill up within four days. Currently {{ $value | humanizePercentage }} is available.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumefillingup
+        summary: PersistentVolume is filling up.
+      expr: |-
+        (
+          kubelet_volume_stats_available_bytes{job="kubelet", namespace=~".*", metrics_path="/metrics"}
+            /
+          kubelet_volume_stats_capacity_bytes{job="kubelet", namespace=~".*", metrics_path="/metrics"}
+        ) < 0.15
+        and
+        predict_linear(kubelet_volume_stats_available_bytes{job="kubelet", namespace=~".*", metrics_path="/metrics"}[6h], 4 * 24 * 3600) < 0
+      for: 1h
+      labels:
+        severity: warning
+    - alert: KubePersistentVolumeErrors
+      annotations:
+        description: The persistent volume {{ $labels.persistentvolume }} has status {{ $labels.phase }}.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumeerrors
+        summary: PersistentVolume is having issues with provisioning.
+      expr: kube_persistentvolume_status_phase{phase=~"Failed|Pending",job="kube-state-metrics"} > 0
+      for: 5m
+      labels:
+        severity: critical
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubernetes-system-apiserver.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kubernetes-system-apiserver
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kubernetes-system-apiserver
+    rules:
+    - alert: KubeClientCertificateExpiration
+      annotations:
+        description: A client certificate used to authenticate to the apiserver is expiring in less than 7.0 days.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeclientcertificateexpiration
+        summary: Client certificate is about to expire.
+      expr: apiserver_client_certificate_expiration_seconds_count{job="apiserver"} > 0 and on(job) histogram_quantile(0.01, sum by (job, le) (rate(apiserver_client_certificate_expiration_seconds_bucket{job="apiserver"}[5m]))) < 604800
+      labels:
+        severity: warning
+    - alert: KubeClientCertificateExpiration
+      annotations:
+        description: A client certificate used to authenticate to the apiserver is expiring in less than 24.0 hours.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeclientcertificateexpiration
+        summary: Client certificate is about to expire.
+      expr: apiserver_client_certificate_expiration_seconds_count{job="apiserver"} > 0 and on(job) histogram_quantile(0.01, sum by (job, le) (rate(apiserver_client_certificate_expiration_seconds_bucket{job="apiserver"}[5m]))) < 86400
+      labels:
+        severity: critical
+    - alert: AggregatedAPIErrors
+      annotations:
+        description: An aggregated API {{ $labels.name }}/{{ $labels.namespace }} has reported errors. The number of errors have increased for it in the past five minutes. High values indicate that the availability of the service changes too often.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-aggregatedapierrors
+        summary: An aggregated API has reported errors.
+      expr: sum by(name, namespace)(increase(aggregator_unavailable_apiservice_count[5m])) > 2
+      labels:
+        severity: warning
+    - alert: AggregatedAPIDown
+      annotations:
+        description: An aggregated API {{ $labels.name }}/{{ $labels.namespace }} has been only {{ $value | humanize }}% available over the last 10m.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-aggregatedapidown
+        summary: An aggregated API is down.
+      expr: (1 - max by(name, namespace)(avg_over_time(aggregator_unavailable_apiservice[10m]))) * 100 < 85
+      for: 5m
+      labels:
+        severity: warning
+    - alert: KubeAPIDown
+      annotations:
+        description: KubeAPI has disappeared from Prometheus target discovery.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapidown
+        summary: Target disappeared from Prometheus target discovery.
+      expr: absent(up{job="apiserver"} == 1)
+      for: 15m
+      labels:
+        severity: critical
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubernetes-system-controller-manager.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kubernetes-system-controller-manager
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kubernetes-system-controller-manager
+    rules:
+    - alert: KubeControllerManagerDown
+      annotations:
+        description: KubeControllerManager has disappeared from Prometheus target discovery.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecontrollermanagerdown
+        summary: Target disappeared from Prometheus target discovery.
+      expr: absent(up{job="kube-controller-manager"} == 1)
+      for: 15m
+      labels:
+        severity: critical
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubernetes-system-kubelet.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kubernetes-system-kubelet
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kubernetes-system-kubelet
+    rules:
+    - alert: KubeNodeNotReady
+      annotations:
+        description: '{{ $labels.node }} has been unready for more than 15 minutes.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodenotready
+        summary: Node is not ready.
+      expr: kube_node_status_condition{job="kube-state-metrics",condition="Ready",status="true"} == 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeNodeUnreachable
+      annotations:
+        description: '{{ $labels.node }} is unreachable and some workloads may be rescheduled.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodeunreachable
+        summary: Node is unreachable.
+      expr: (kube_node_spec_taint{job="kube-state-metrics",key="node.kubernetes.io/unreachable",effect="NoSchedule"} unless ignoring(key,value) kube_node_spec_taint{job="kube-state-metrics",key=~"ToBeDeletedByClusterAutoscaler|cloud.google.com/impending-node-termination|aws-node-termination-handler/spot-itn"}) == 1
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeletTooManyPods
+      annotations:
+        description: Kubelet '{{ $labels.node }}' is running at {{ $value | humanizePercentage }} of its Pod capacity.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubelettoomanypods
+        summary: Kubelet is running at capacity.
+      expr: |-
+        count by(node) (
+          (kube_pod_status_phase{job="kube-state-metrics",phase="Running"} == 1) * on(instance,pod,namespace,cluster) group_left(node) topk by(instance,pod,namespace,cluster) (1, kube_pod_info{job="kube-state-metrics"})
+        )
+        /
+        max by(node) (
+          kube_node_status_capacity_pods{job="kube-state-metrics"} != 1
+        ) > 0.95
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeNodeReadinessFlapping
+      annotations:
+        description: The readiness status of node {{ $labels.node }} has changed {{ $value }} times in the last 15 minutes.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodereadinessflapping
+        summary: Node readiness status is flapping.
+      expr: sum(changes(kube_node_status_condition{status="true",condition="Ready"}[15m])) by (node) > 2
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeletPlegDurationHigh
+      annotations:
+        description: The Kubelet Pod Lifecycle Event Generator has a 99th percentile duration of {{ $value }} seconds on node {{ $labels.node }}.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletplegdurationhigh
+        summary: Kubelet Pod Lifecycle Event Generator is taking too long to relist.
+      expr: node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile{quantile="0.99"} >= 10
+      for: 5m
+      labels:
+        severity: warning
+    - alert: KubeletPodStartUpLatencyHigh
+      annotations:
+        description: Kubelet Pod startup 99th percentile latency is {{ $value }} seconds on node {{ $labels.node }}.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletpodstartuplatencyhigh
+        summary: Kubelet Pod startup latency is too high.
+      expr: histogram_quantile(0.99, sum(rate(kubelet_pod_worker_duration_seconds_bucket{job="kubelet", metrics_path="/metrics"}[5m])) by (instance, le)) * on(instance) group_left(node) kubelet_node_name{job="kubelet", metrics_path="/metrics"} > 60
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeletClientCertificateExpiration
+      annotations:
+        description: Client certificate for Kubelet on node {{ $labels.node }} expires in {{ $value | humanizeDuration }}.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletclientcertificateexpiration
+        summary: Kubelet client certificate is about to expire.
+      expr: kubelet_certificate_manager_client_ttl_seconds < 604800
+      labels:
+        severity: warning
+    - alert: KubeletClientCertificateExpiration
+      annotations:
+        description: Client certificate for Kubelet on node {{ $labels.node }} expires in {{ $value | humanizeDuration }}.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletclientcertificateexpiration
+        summary: Kubelet client certificate is about to expire.
+      expr: kubelet_certificate_manager_client_ttl_seconds < 86400
+      labels:
+        severity: critical
+    - alert: KubeletServerCertificateExpiration
+      annotations:
+        description: Server certificate for Kubelet on node {{ $labels.node }} expires in {{ $value | humanizeDuration }}.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletservercertificateexpiration
+        summary: Kubelet server certificate is about to expire.
+      expr: kubelet_certificate_manager_server_ttl_seconds < 604800
+      labels:
+        severity: warning
+    - alert: KubeletServerCertificateExpiration
+      annotations:
+        description: Server certificate for Kubelet on node {{ $labels.node }} expires in {{ $value | humanizeDuration }}.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletservercertificateexpiration
+        summary: Kubelet server certificate is about to expire.
+      expr: kubelet_certificate_manager_server_ttl_seconds < 86400
+      labels:
+        severity: critical
+    - alert: KubeletClientCertificateRenewalErrors
+      annotations:
+        description: Kubelet on node {{ $labels.node }} has failed to renew its client certificate ({{ $value | humanize }} errors in the last 5 minutes).
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletclientcertificaterenewalerrors
+        summary: Kubelet has failed to renew its client certificate.
+      expr: increase(kubelet_certificate_manager_client_expiration_renew_errors[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeletServerCertificateRenewalErrors
+      annotations:
+        description: Kubelet on node {{ $labels.node }} has failed to renew its server certificate ({{ $value | humanize }} errors in the last 5 minutes).
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletservercertificaterenewalerrors
+        summary: Kubelet has failed to renew its server certificate.
+      expr: increase(kubelet_server_expiration_renew_errors[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeletDown
+      annotations:
+        description: Kubelet has disappeared from Prometheus target discovery.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletdown
+        summary: Target disappeared from Prometheus target discovery.
+      expr: absent(up{job="kubelet", metrics_path="/metrics"} == 1)
+      for: 15m
+      labels:
+        severity: critical
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubernetes-system-scheduler.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kubernetes-system-scheduler
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kubernetes-system-scheduler
+    rules:
+    - alert: KubeSchedulerDown
+      annotations:
+        description: KubeScheduler has disappeared from Prometheus target discovery.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeschedulerdown
+        summary: Target disappeared from Prometheus target discovery.
+      expr: absent(up{job="kube-scheduler"} == 1)
+      for: 15m
+      labels:
+        severity: critical
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/kubernetes-system.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-kubernetes-system
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: kubernetes-system
+    rules:
+    - alert: KubeVersionMismatch
+      annotations:
+        description: There are {{ $value }} different semantic versions of Kubernetes components running.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeversionmismatch
+        summary: Different semantic versions of Kubernetes components running.
+      expr: count(count by (gitVersion) (label_replace(kubernetes_build_info{job!~"kube-dns|coredns"},"gitVersion","$1","gitVersion","(v[0-9]*.[0-9]*).*"))) > 1
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeClientErrors
+      annotations:
+        description: Kubernetes API server client '{{ $labels.job }}/{{ $labels.instance }}' is experiencing {{ $value | humanizePercentage }} errors.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeclienterrors
+        summary: Kubernetes API server client is experiencing errors.
+      expr: |-
+        (sum(rate(rest_client_requests_total{code=~"5.."}[5m])) by (instance, job)
+          /
+        sum(rate(rest_client_requests_total[5m])) by (instance, job))
+        > 0.01
+      for: 15m
+      labels:
+        severity: warning
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/node-exporter.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-node-exporter.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: node-exporter.rules
+    rules:
+    - expr: |-
+        count without (cpu) (
+          count without (mode) (
+            node_cpu_seconds_total{job="node-exporter"}
+          )
+        )
+      record: instance:node_num_cpu:sum
+    - expr: |-
+        1 - avg without (cpu, mode) (
+          rate(node_cpu_seconds_total{job="node-exporter", mode="idle"}[1m])
+        )
+      record: instance:node_cpu_utilisation:rate1m
+    - expr: |-
+        (
+          node_load1{job="node-exporter"}
+        /
+          instance:node_num_cpu:sum{job="node-exporter"}
+        )
+      record: instance:node_load1_per_cpu:ratio
+    - expr: |-
+        1 - (
+          node_memory_MemAvailable_bytes{job="node-exporter"}
+        /
+          node_memory_MemTotal_bytes{job="node-exporter"}
+        )
+      record: instance:node_memory_utilisation:ratio
+    - expr: rate(node_vmstat_pgmajfault{job="node-exporter"}[1m])
+      record: instance:node_vmstat_pgmajfault:rate1m
+    - expr: rate(node_disk_io_time_seconds_total{job="node-exporter", device=~"mmcblk.p.+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|dasd.+"}[1m])
+      record: instance_device:node_disk_io_time_seconds:rate1m
+    - expr: rate(node_disk_io_time_weighted_seconds_total{job="node-exporter", device=~"mmcblk.p.+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|dasd.+"}[1m])
+      record: instance_device:node_disk_io_time_weighted_seconds:rate1m
+    - expr: |-
+        sum without (device) (
+          rate(node_network_receive_bytes_total{job="node-exporter", device!="lo"}[1m])
+        )
+      record: instance:node_network_receive_bytes_excluding_lo:rate1m
+    - expr: |-
+        sum without (device) (
+          rate(node_network_transmit_bytes_total{job="node-exporter", device!="lo"}[1m])
+        )
+      record: instance:node_network_transmit_bytes_excluding_lo:rate1m
+    - expr: |-
+        sum without (device) (
+          rate(node_network_receive_drop_total{job="node-exporter", device!="lo"}[1m])
+        )
+      record: instance:node_network_receive_drop_excluding_lo:rate1m
+    - expr: |-
+        sum without (device) (
+          rate(node_network_transmit_drop_total{job="node-exporter", device!="lo"}[1m])
+        )
+      record: instance:node_network_transmit_drop_excluding_lo:rate1m
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/node-exporter.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-node-exporter
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: node-exporter
+    rules:
+    - alert: NodeFilesystemSpaceFillingUp
+      annotations:
+        description: Filesystem on {{ $labels.device }} at {{ $labels.instance }} has only {{ printf "%.2f" $value }}% available space left and is filling up.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodefilesystemspacefillingup
+        summary: Filesystem is predicted to run out of space within the next 24 hours.
+      expr: |-
+        (
+          node_filesystem_avail_bytes{job="node-exporter",fstype!=""} / node_filesystem_size_bytes{job="node-exporter",fstype!=""} * 100 < 40
+        and
+          predict_linear(node_filesystem_avail_bytes{job="node-exporter",fstype!=""}[6h], 24*60*60) < 0
+        and
+          node_filesystem_readonly{job="node-exporter",fstype!=""} == 0
+        )
+      for: 1h
+      labels:
+        severity: warning
+    - alert: NodeFilesystemSpaceFillingUp
+      annotations:
+        description: Filesystem on {{ $labels.device }} at {{ $labels.instance }} has only {{ printf "%.2f" $value }}% available space left and is filling up fast.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodefilesystemspacefillingup
+        summary: Filesystem is predicted to run out of space within the next 4 hours.
+      expr: |-
+        (
+          node_filesystem_avail_bytes{job="node-exporter",fstype!=""} / node_filesystem_size_bytes{job="node-exporter",fstype!=""} * 100 < 15
+        and
+          predict_linear(node_filesystem_avail_bytes{job="node-exporter",fstype!=""}[6h], 4*60*60) < 0
+        and
+          node_filesystem_readonly{job="node-exporter",fstype!=""} == 0
+        )
+      for: 1h
+      labels:
+        severity: critical
+    - alert: NodeFilesystemAlmostOutOfSpace
+      annotations:
+        description: Filesystem on {{ $labels.device }} at {{ $labels.instance }} has only {{ printf "%.2f" $value }}% available space left.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodefilesystemalmostoutofspace
+        summary: Filesystem has less than 5% space left.
+      expr: |-
+        (
+          node_filesystem_avail_bytes{job="node-exporter",fstype!=""} / node_filesystem_size_bytes{job="node-exporter",fstype!=""} * 100 < 5
+        and
+          node_filesystem_readonly{job="node-exporter",fstype!=""} == 0
+        )
+      for: 1h
+      labels:
+        severity: warning
+    - alert: NodeFilesystemAlmostOutOfSpace
+      annotations:
+        description: Filesystem on {{ $labels.device }} at {{ $labels.instance }} has only {{ printf "%.2f" $value }}% available space left.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodefilesystemalmostoutofspace
+        summary: Filesystem has less than 3% space left.
+      expr: |-
+        (
+          node_filesystem_avail_bytes{job="node-exporter",fstype!=""} / node_filesystem_size_bytes{job="node-exporter",fstype!=""} * 100 < 3
+        and
+          node_filesystem_readonly{job="node-exporter",fstype!=""} == 0
+        )
+      for: 1h
+      labels:
+        severity: critical
+    - alert: NodeFilesystemFilesFillingUp
+      annotations:
+        description: Filesystem on {{ $labels.device }} at {{ $labels.instance }} has only {{ printf "%.2f" $value }}% available inodes left and is filling up.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodefilesystemfilesfillingup
+        summary: Filesystem is predicted to run out of inodes within the next 24 hours.
+      expr: |-
+        (
+          node_filesystem_files_free{job="node-exporter",fstype!=""} / node_filesystem_files{job="node-exporter",fstype!=""} * 100 < 40
+        and
+          predict_linear(node_filesystem_files_free{job="node-exporter",fstype!=""}[6h], 24*60*60) < 0
+        and
+          node_filesystem_readonly{job="node-exporter",fstype!=""} == 0
+        )
+      for: 1h
+      labels:
+        severity: warning
+    - alert: NodeFilesystemFilesFillingUp
+      annotations:
+        description: Filesystem on {{ $labels.device }} at {{ $labels.instance }} has only {{ printf "%.2f" $value }}% available inodes left and is filling up fast.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodefilesystemfilesfillingup
+        summary: Filesystem is predicted to run out of inodes within the next 4 hours.
+      expr: |-
+        (
+          node_filesystem_files_free{job="node-exporter",fstype!=""} / node_filesystem_files{job="node-exporter",fstype!=""} * 100 < 20
+        and
+          predict_linear(node_filesystem_files_free{job="node-exporter",fstype!=""}[6h], 4*60*60) < 0
+        and
+          node_filesystem_readonly{job="node-exporter",fstype!=""} == 0
+        )
+      for: 1h
+      labels:
+        severity: critical
+    - alert: NodeFilesystemAlmostOutOfFiles
+      annotations:
+        description: Filesystem on {{ $labels.device }} at {{ $labels.instance }} has only {{ printf "%.2f" $value }}% available inodes left.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodefilesystemalmostoutoffiles
+        summary: Filesystem has less than 5% inodes left.
+      expr: |-
+        (
+          node_filesystem_files_free{job="node-exporter",fstype!=""} / node_filesystem_files{job="node-exporter",fstype!=""} * 100 < 5
+        and
+          node_filesystem_readonly{job="node-exporter",fstype!=""} == 0
+        )
+      for: 1h
+      labels:
+        severity: warning
+    - alert: NodeFilesystemAlmostOutOfFiles
+      annotations:
+        description: Filesystem on {{ $labels.device }} at {{ $labels.instance }} has only {{ printf "%.2f" $value }}% available inodes left.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodefilesystemalmostoutoffiles
+        summary: Filesystem has less than 3% inodes left.
+      expr: |-
+        (
+          node_filesystem_files_free{job="node-exporter",fstype!=""} / node_filesystem_files{job="node-exporter",fstype!=""} * 100 < 3
+        and
+          node_filesystem_readonly{job="node-exporter",fstype!=""} == 0
+        )
+      for: 1h
+      labels:
+        severity: critical
+    - alert: NodeNetworkReceiveErrs
+      annotations:
+        description: '{{ $labels.instance }} interface {{ $labels.device }} has encountered {{ printf "%.0f" $value }} receive errors in the last two minutes.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodenetworkreceiveerrs
+        summary: Network interface is reporting many receive errors.
+      expr: rate(node_network_receive_errs_total[2m]) / rate(node_network_receive_packets_total[2m]) > 0.01
+      for: 1h
+      labels:
+        severity: warning
+    - alert: NodeNetworkTransmitErrs
+      annotations:
+        description: '{{ $labels.instance }} interface {{ $labels.device }} has encountered {{ printf "%.0f" $value }} transmit errors in the last two minutes.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodenetworktransmiterrs
+        summary: Network interface is reporting many transmit errors.
+      expr: rate(node_network_transmit_errs_total[2m]) / rate(node_network_transmit_packets_total[2m]) > 0.01
+      for: 1h
+      labels:
+        severity: warning
+    - alert: NodeHighNumberConntrackEntriesUsed
+      annotations:
+        description: '{{ $value | humanizePercentage }} of conntrack entries are used.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodehighnumberconntrackentriesused
+        summary: Number of conntrack are getting close to the limit.
+      expr: (node_nf_conntrack_entries / node_nf_conntrack_entries_limit) > 0.75
+      labels:
+        severity: warning
+    - alert: NodeTextFileCollectorScrapeError
+      annotations:
+        description: Node Exporter text file collector failed to scrape.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodetextfilecollectorscrapeerror
+        summary: Node Exporter text file collector failed to scrape.
+      expr: node_textfile_scrape_error{job="node-exporter"} == 1
+      labels:
+        severity: warning
+    - alert: NodeClockSkewDetected
+      annotations:
+        message: Clock on {{ $labels.instance }} is out of sync by more than 300s. Ensure NTP is configured correctly on this host.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodeclockskewdetected
+        summary: Clock skew detected.
+      expr: |-
+        (
+          node_timex_offset_seconds > 0.05
+        and
+          deriv(node_timex_offset_seconds[5m]) >= 0
+        )
+        or
+        (
+          node_timex_offset_seconds < -0.05
+        and
+          deriv(node_timex_offset_seconds[5m]) <= 0
+        )
+      for: 10m
+      labels:
+        severity: warning
+    - alert: NodeClockNotSynchronising
+      annotations:
+        message: Clock on {{ $labels.instance }} is not synchronising. Ensure NTP is configured on this host.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-nodeclocknotsynchronising
+        summary: Clock not synchronising.
+      expr: |-
+        min_over_time(node_timex_sync_status[5m]) == 0
+        and
+        node_timex_maxerror_seconds >= 16
+      for: 10m
+      labels:
+        severity: warning
+    - alert: NodeRAIDDegraded
+      annotations:
+        description: RAID array '{{ $labels.device }}' on {{ $labels.instance }} is in degraded state due to one or more disks failures. Number of spare drives is insufficient to fix issue automatically.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-noderaiddegraded
+        summary: RAID Array is degraded
+      expr: node_md_disks_required - ignoring (state) (node_md_disks{state="active"}) > 0
+      for: 15m
+      labels:
+        severity: critical
+    - alert: NodeRAIDDiskFailure
+      annotations:
+        description: At least one device in RAID array on {{ $labels.instance }} failed. Array '{{ $labels.device }}' needs attention and possibly a disk swap.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-noderaiddiskfailure
+        summary: Failed device in RAID array
+      expr: node_md_disks{state="fail"} > 0
+      labels:
+        severity: warning
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/node-network.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-node-network
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: node-network
+    rules:
+    - alert: NodeNetworkInterfaceFlapping
+      annotations:
+        message: Network interface "{{ $labels.device }}" changing it's up status often on node-exporter {{ $labels.namespace }}/{{ $labels.pod }}"
+      expr: changes(node_network_up{job="node-exporter",device!~"veth.+"}[2m]) > 2
+      for: 2m
+      labels:
+        severity: warning
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/node.rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-node.rules
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: node.rules
+    rules:
+    - expr: sum(min(kube_pod_info{node!=""}) by (cluster, node))
+      record: ':kube_pod_info_node_count:'
+    - expr: |-
+        topk by(namespace, pod) (1,
+          max by (node, namespace, pod) (
+            label_replace(kube_pod_info{job="kube-state-metrics",node!=""}, "pod", "$1", "pod", "(.*)")
+        ))
+      record: 'node_namespace_pod:kube_pod_info:'
+    - expr: |-
+        count by (cluster, node) (sum by (node, cpu) (
+          node_cpu_seconds_total{job="node-exporter"}
+        * on (namespace, pod) group_left(node)
+          node_namespace_pod:kube_pod_info:
+        ))
+      record: node:node_num_cpu:sum
+    - expr: |-
+        sum(
+          node_memory_MemAvailable_bytes{job="node-exporter"} or
+          (
+            node_memory_Buffers_bytes{job="node-exporter"} +
+            node_memory_Cached_bytes{job="node-exporter"} +
+            node_memory_MemFree_bytes{job="node-exporter"} +
+            node_memory_Slab_bytes{job="node-exporter"}
+          )
+        ) by (cluster)
+      record: :node_memory_MemAvailable_bytes:sum
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/prometheus-operator.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-prometheus-operator
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: prometheus-operator
+    rules:
+    - alert: PrometheusOperatorListErrors
+      annotations:
+        description: Errors while performing List operations in controller {{$labels.controller}} in {{$labels.namespace}} namespace.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-prometheusoperatorlisterrors
+        summary: Errors while performing list operations in controller.
+      expr: (sum by (controller,namespace) (rate(prometheus_operator_list_operations_failed_total{job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[10m])) / sum by (controller,namespace) (rate(prometheus_operator_list_operations_total{job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[10m]))) > 0.4
+      for: 15m
+      labels:
+        severity: warning
+    - alert: PrometheusOperatorWatchErrors
+      annotations:
+        description: Errors while performing watch operations in controller {{$labels.controller}} in {{$labels.namespace}} namespace.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-prometheusoperatorwatcherrors
+        summary: Errors while performing watch operations in controller.
+      expr: (sum by (controller,namespace) (rate(prometheus_operator_watch_operations_failed_total{job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[10m])) / sum by (controller,namespace) (rate(prometheus_operator_watch_operations_total{job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[10m]))) > 0.4
+      for: 15m
+      labels:
+        severity: warning
+    - alert: PrometheusOperatorSyncFailed
+      annotations:
+        description: Controller {{ $labels.controller }} in {{ $labels.namespace }} namespace fails to reconcile {{ $value }} objects.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-prometheusoperatorsyncfailed
+        summary: Last controller reconciliation failed
+      expr: min_over_time(prometheus_operator_syncs{status="failed",job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[5m]) > 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: PrometheusOperatorReconcileErrors
+      annotations:
+        description: '{{ $value | humanizePercentage }} of reconciling operations failed for {{ $labels.controller }} controller in {{ $labels.namespace }} namespace.'
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-prometheusoperatorreconcileerrors
+        summary: Errors while reconciling controller.
+      expr: (sum by (controller,namespace) (rate(prometheus_operator_reconcile_errors_total{job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[5m]))) / (sum by (controller,namespace) (rate(prometheus_operator_reconcile_operations_total{job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[5m]))) > 0.1
+      for: 10m
+      labels:
+        severity: warning
+    - alert: PrometheusOperatorNodeLookupErrors
+      annotations:
+        description: Errors while reconciling Prometheus in {{ $labels.namespace }} Namespace.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-prometheusoperatornodelookuperrors
+        summary: Errors while reconciling Prometheus.
+      expr: rate(prometheus_operator_node_address_lookup_errors_total{job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[5m]) > 0.1
+      for: 10m
+      labels:
+        severity: warning
+    - alert: PrometheusOperatorNotReady
+      annotations:
+        description: Prometheus operator in {{ $labels.namespace }} namespace isn't ready to reconcile {{ $labels.controller }} resources.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-prometheusoperatornotready
+        summary: Prometheus operator not ready
+      expr: min by(namespace, controller) (max_over_time(prometheus_operator_ready{job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[5m]) == 0)
+      for: 5m
+      labels:
+        severity: warning
+    - alert: PrometheusOperatorRejectedResources
+      annotations:
+        description: Prometheus operator in {{ $labels.namespace }} namespace rejected {{ printf "%0.0f" $value }} {{ $labels.controller }}/{{ $labels.resource }} resources.
+        runbook_url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-prometheusoperatorrejectedresources
+        summary: Resources rejected by Prometheus operator
+      expr: min_over_time(prometheus_operator_managed_resources{state="rejected",job="arcade-fluentd-kube-promet-operator",namespace="fluentd"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/rules-1.14/prometheus.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: arcade-fluentd-kube-promet-prometheus
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  groups:
+  - name: prometheus
+    rules:
+    - alert: PrometheusBadConfig
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has failed to reload its configuration.
+        summary: Failed Prometheus configuration reload.
+      expr: |-
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        max_over_time(prometheus_config_last_reload_successful{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m]) == 0
+      for: 10m
+      labels:
+        severity: critical
+    - alert: PrometheusNotificationQueueRunningFull
+      annotations:
+        description: Alert notification queue of Prometheus {{$labels.namespace}}/{{$labels.pod}} is running full.
+        summary: Prometheus alert notification queue predicted to run full in less than 30m.
+      expr: |-
+        # Without min_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        (
+          predict_linear(prometheus_notifications_queue_length{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m], 60 * 30)
+        >
+          min_over_time(prometheus_notifications_queue_capacity{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        )
+      for: 15m
+      labels:
+        severity: warning
+    - alert: PrometheusErrorSendingAlertsToSomeAlertmanagers
+      annotations:
+        description: '{{ printf "%.1f" $value }}% errors while sending alerts from Prometheus {{$labels.namespace}}/{{$labels.pod}} to Alertmanager {{$labels.alertmanager}}.'
+        summary: Prometheus has encountered more than 1% errors sending alerts to a specific Alertmanager.
+      expr: |-
+        (
+          rate(prometheus_notifications_errors_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        /
+          rate(prometheus_notifications_sent_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        )
+        * 100
+        > 1
+      for: 15m
+      labels:
+        severity: warning
+    - alert: PrometheusErrorSendingAlertsToAnyAlertmanager
+      annotations:
+        description: '{{ printf "%.1f" $value }}% minimum errors while sending alerts from Prometheus {{$labels.namespace}}/{{$labels.pod}} to any Alertmanager.'
+        summary: Prometheus encounters more than 3% errors sending alerts to any Alertmanager.
+      expr: |-
+        min without(alertmanager) (
+          rate(prometheus_notifications_errors_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        /
+          rate(prometheus_notifications_sent_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        )
+        * 100
+        > 3
+      for: 15m
+      labels:
+        severity: critical
+    - alert: PrometheusNotConnectedToAlertmanagers
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} is not connected to any Alertmanagers.
+        summary: Prometheus is not connected to any Alertmanagers.
+      expr: |-
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        max_over_time(prometheus_notifications_alertmanagers_discovered{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m]) < 1
+      for: 10m
+      labels:
+        severity: warning
+    - alert: PrometheusTSDBReloadsFailing
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has detected {{$value | humanize}} reload failures over the last 3h.
+        summary: Prometheus has issues reloading blocks from disk.
+      expr: increase(prometheus_tsdb_reloads_failures_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[3h]) > 0
+      for: 4h
+      labels:
+        severity: warning
+    - alert: PrometheusTSDBCompactionsFailing
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has detected {{$value | humanize}} compaction failures over the last 3h.
+        summary: Prometheus has issues compacting blocks.
+      expr: increase(prometheus_tsdb_compactions_failed_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[3h]) > 0
+      for: 4h
+      labels:
+        severity: warning
+    - alert: PrometheusNotIngestingSamples
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} is not ingesting samples.
+        summary: Prometheus is not ingesting samples.
+      expr: rate(prometheus_tsdb_head_samples_appended_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m]) <= 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: PrometheusDuplicateTimestamps
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} is dropping {{ printf "%.4g" $value  }} samples/s with different values but duplicated timestamp.
+        summary: Prometheus is dropping samples with duplicate timestamps.
+      expr: rate(prometheus_target_scrapes_sample_duplicate_timestamp_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m]) > 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: PrometheusOutOfOrderTimestamps
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} is dropping {{ printf "%.4g" $value  }} samples/s with timestamps arriving out of order.
+        summary: Prometheus drops samples with out-of-order timestamps.
+      expr: rate(prometheus_target_scrapes_sample_out_of_order_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m]) > 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: PrometheusRemoteStorageFailures
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} failed to send {{ printf "%.1f" $value }}% of the samples to {{ $labels.remote_name}}:{{ $labels.url }}
+        summary: Prometheus fails to send samples to remote storage.
+      expr: |-
+        (
+          rate(prometheus_remote_storage_failed_samples_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        /
+          (
+            rate(prometheus_remote_storage_failed_samples_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+          +
+            rate(prometheus_remote_storage_succeeded_samples_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+          )
+        )
+        * 100
+        > 1
+      for: 15m
+      labels:
+        severity: critical
+    - alert: PrometheusRemoteWriteBehind
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} remote write is {{ printf "%.1f" $value }}s behind for {{ $labels.remote_name}}:{{ $labels.url }}.
+        summary: Prometheus remote write is behind.
+      expr: |-
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        (
+          max_over_time(prometheus_remote_storage_highest_timestamp_in_seconds{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        - on(job, instance) group_right
+          max_over_time(prometheus_remote_storage_queue_highest_sent_timestamp_seconds{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        )
+        > 120
+      for: 15m
+      labels:
+        severity: critical
+    - alert: PrometheusRemoteWriteDesiredShards
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} remote write desired shards calculation wants to run {{ $value }} shards for queue {{ $labels.remote_name}}:{{ $labels.url }}, which is more than the max of {{ printf `prometheus_remote_storage_shards_max{instance="%s",job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}` $labels.instance | query | first | value }}.
+        summary: Prometheus remote write desired shards calculation wants to run more than configured max shards.
+      expr: |-
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        (
+          max_over_time(prometheus_remote_storage_shards_desired{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        >
+          max_over_time(prometheus_remote_storage_shards_max{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m])
+        )
+      for: 15m
+      labels:
+        severity: warning
+    - alert: PrometheusRuleFailures
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has failed to evaluate {{ printf "%.0f" $value }} rules in the last 5m.
+        summary: Prometheus is failing rule evaluations.
+      expr: increase(prometheus_rule_evaluation_failures_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m]) > 0
+      for: 15m
+      labels:
+        severity: critical
+    - alert: PrometheusMissingRuleEvaluations
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has missed {{ printf "%.0f" $value }} rule group evaluations in the last 5m.
+        summary: Prometheus is missing rule evaluations due to slow rule group evaluation.
+      expr: increase(prometheus_rule_group_iterations_missed_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: PrometheusTargetLimitHit
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has dropped {{ printf "%.0f" $value }} targets because the number of targets exceeded the configured target_limit.
+        summary: Prometheus has dropped targets because some scrape configs have exceeded the targets limit.
+      expr: increase(prometheus_target_scrape_pool_exceeded_target_limit_total{job="arcade-fluentd-kube-promet-prometheus",namespace="fluentd"}[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/core-dns/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-coredns
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-coredns
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  jobLabel: jobLabel
+  selector:
+    matchLabels:
+      app: kube-prometheus-stack-coredns
+      release: "arcade-fluentd"
+  namespaceSelector:
+    matchNames:
+      - "kube-system"
+  endpoints:
+  - port: http-metrics
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    metricRelabelings:
+    - action: keep
+      regex: (?:coredns_cache_(size|entries|(hits|misses)_total)|coredns_dns_request_duration_seconds_(count|sum)|coredns_(dns_request|dns_response_rcode|forward_request)_count_total|coredns_(forward_requests|dns_requests|dns_responses)_total|process_(cpu_seconds_total|open_fds|resident_memory_bytes))
+      sourceLabels:
+      - __name__
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-api-server/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-apiserver
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-apiserver
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    port: https
+    scheme: https
+    metricRelabelings:
+      - action: keep
+        regex: (?:apiserver_request_(?:count|total)|apiserver_request_(?:duration_seconds|latencies)_(?:count|sum)|apiserver_request_latencies_summary(?:|_count|_sum)|apiserver_request_duration_seconds_bucket)
+        sourceLabels:
+        - __name__
+    tlsConfig:
+      caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      serverName: kubernetes
+      insecureSkipVerify: false
+  jobLabel: component
+  namespaceSelector:
+    matchNames:
+    - default
+  selector:
+    matchLabels:
+      component: apiserver
+      provider: kubernetes
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-controller-manager/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-kube-controller-manager
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-kube-controller-manager
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  jobLabel: jobLabel
+  selector:
+    matchLabels:
+      app: kube-prometheus-stack-kube-controller-manager
+      release: "arcade-fluentd"
+  namespaceSelector:
+    matchNames:
+      - "kube-system"
+  endpoints:
+  - port: http-metrics
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    metricRelabelings:
+    - action: keep
+      regex: (?:cloudprovider_.*_api_request_duration_seconds.*)
+      sourceLabels:
+      - __name__
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-etcd/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-kube-etcd
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-kube-etcd
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  jobLabel: jobLabel
+  selector:
+    matchLabels:
+      app: kube-prometheus-stack-kube-etcd
+      release: "arcade-fluentd"
+  namespaceSelector:
+    matchNames:
+      - "kube-system"
+  endpoints:
+  - port: http-metrics
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    metricRelabelings:
+    - action: keep
+      regex: (?:etcd_request_cache_(?:add|get)_(?:duration_seconds|latencies_summary)_(?:count|sum)|etcd_helper_cache_(?:hit|miss)_(?:count|total)|etcd_debugging_(mvcc_db_total_size_in_bytes|store_(expires_total|watchers))|etcd_disk_(backend_commit|wal_fsync)_duration_seconds_bucket|etcd_grpc_proxy_cache_(hits|misses)_total|etcd_network_client_grpc_(received|sent)_bytes_total|etcd_server_(has_leader|leader_changes_seen_total)|etcd_server_proposals_(pending|(applied|committed|failed)_total)|process_(cpu_seconds_total|open_fds|resident_memory_bytes))
+      sourceLabels:
+      - __name__
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-proxy/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-kube-proxy
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-kube-proxy
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  jobLabel: jobLabel
+  selector:
+    matchLabels:
+      app: kube-prometheus-stack-kube-proxy
+      release: "arcade-fluentd"
+  namespaceSelector:
+    matchNames:
+      - "kube-system"
+  endpoints:
+  - port: http-metrics
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-scheduler/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-kube-scheduler
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-kube-scheduler
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  jobLabel: jobLabel
+  selector:
+    matchLabels:
+      app: kube-prometheus-stack-kube-scheduler
+      release: "arcade-fluentd"
+  namespaceSelector:
+    matchNames:
+      - "kube-system"
+  endpoints:
+  - port: http-metrics
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    metricRelabelings:
+    - action: keep
+      regex: (?:scheduler_(?:e2e_scheduling|binding|framework_extension_point|scheduling_algorithm)_duration_seconds.*)
+      sourceLabels:
+      - __name__
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-state-metrics/serviceMonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-kube-state-metrics
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-kube-state-metrics
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  jobLabel: app.kubernetes.io/name
+  endpoints:
+  - port: http
+    honorLabels: true
+    metricRelabelings:
+    - action: keep
+      regex: (?:kube_statefulset_status_observed_generation|kube_statefulset_status_replicas|kube_statefulset_replicas|kube_statefulset_metadata_generation|kube_daemonset_status_current_number_scheduled|kube_daemonset_status_desired_number_scheduled|kube_daemonset_status_number_misscheduled|kube_daemonset_status_number_unavailable|kube_deployment_spec_replicas|kube_deployment_status_replicas_available|kube_deployment_status_replicas_unavailable|kube_node_info|kube_node_status_allocatable|kube_node_status_capacity|kube_node_status_condition|kube_hpa_spec_max_replicas|kube_hpa_spec_min_replicas|kube_hpa_status_(condition|(current|desired)_replicas)|kube_pod_container_info|kube_pod_container_resource_requests|kube_pod_container_resource_limits|kube_pod_container_status_ready|kube_pod_container_status_terminated_reason|kube_pod_container_status_waiting_reason|kube_pod_container_status_restarts_total|kube_pod_status_phase|kube_pod_info|kube_service_info|kube_service_spec_external_ip|kube_service_spec_type|kube_service_status_load_balancer_ingress)
+      sourceLabels:
+      - __name__
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+      app.kubernetes.io/instance: "arcade-fluentd"
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kubelet/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-kubelet
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-kubelet    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  endpoints:
+  - port: https-metrics
+    scheme: https
+    tlsConfig:
+      caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      insecureSkipVerify: true
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    honorLabels: true
+    metricRelabelings:
+    - action: keep
+      regex: (?:kubelet_docker_operations_errors(?:|_total)|kubelet_(?:docker|runtime)_operations_duration_seconds_(?:count|sum)|kubelet_running_(?:container|pod)(?:_count|s)|kubelet_(:?docker|runtime)_operations_latency_microseconds(?:|_count|_sum))
+      sourceLabels:
+      - __name__
+    - action: labeldrop
+      regex: id
+    relabelings:
+    - sourceLabels:
+      - __metrics_path__
+      targetLabel: metrics_path
+  - port: https-metrics
+    scheme: https
+    path: /metrics/cadvisor
+    honorLabels: true
+    tlsConfig:
+      caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      insecureSkipVerify: true
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    metricRelabelings:
+    - action: keep
+      regex: (?:container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_fs_usage_bytes|container_fs_limit_bytes|container_cpu_cfs_throttled_seconds_total|container_network_receive_bytes_total|container_network_transmit_bytes_total)
+      sourceLabels:
+      - __name__
+    - action: labelmap
+      regex: container_name
+      replacement: container
+    - action: drop
+      regex: POD
+      sourceLabels:
+      - container
+    - action: labeldrop
+      regex: (id|name)
+    relabelings:
+    - sourceLabels:
+      - __metrics_path__
+      targetLabel: metrics_path
+  jobLabel: k8s-app
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  selector:
+    matchLabels:
+      k8s-app: kubelet
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/node-exporter/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-node-exporter
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-node-exporter
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  jobLabel: jobLabel
+  selector:
+    matchLabels:
+      app: prometheus-node-exporter
+      release: arcade-fluentd
+  endpoints:
+  - port: metrics
+    metricRelabelings:
+    - action: keep
+      regex: (?:node_load1|node_load5|node_load15|node_cpu_seconds_total|node_disk_io_time_weighted_seconds_total|node_disk_io_time_seconds_total|node_vmstat_pgpgin|node_vmstat_pgpgout|node_memory_MemFree_bytes|node_memory_Cached_bytes|node_memory_Buffers_bytes|node_memory_MemTotal_bytes|node_network_receive_drop_total|node_network_transmit_drop_total|node_network_receive_bytes_total|node_network_transmit_bytes_total|node_filesystem_avail_bytes|node_filesystem_size_bytes)
+      sourceLabels:
+      - __name__
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus-operator/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-operator
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-operator
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  endpoints:
+  - port: http
+    honorLabels: true
+  selector:
+    matchLabels:
+      app: kube-prometheus-stack-operator
+      release: "arcade-fluentd"
+  namespaceSelector:
+    matchNames:
+      - "fluentd"
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: arcade-fluentd-kube-promet-prometheus
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  selector:
+    matchLabels:
+      app: kube-prometheus-stack-prometheus
+      release: "arcade-fluentd"
+      self-monitor: "true"
+  namespaceSelector:
+    matchNames:
+      - "fluentd"
+  endpoints:
+  - port: web
+    path: "/metrics"
+

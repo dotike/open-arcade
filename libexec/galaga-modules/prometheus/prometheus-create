@@ -1,0 +1,347 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+import argparse
+import logging
+import os
+import sys
+import time
+import boto3
+from pprint import pprint
+from arclib import log
+from arclib import storage
+from arclib import eks
+from arclib import k8s
+from botocore.exceptions import ClientError
+
+from prometheus_grafana import *
+
+
+def get_nodegroup_status(cluster_name: str, arcade_name: str) -> str:
+    """Gets the Status of the Nodegroup for a EKS cluster
+
+    Args:
+        cluster_name (str): Name of the EKS cluster
+        arcade_name (str): Name of the Arcade
+
+    Returns:
+        str: a string rep of the status
+    """
+    format_arcade_name = arcade_name.replace('.', '-')
+    nodegroup_name = f"asteroids_nodegroup-{format_arcade_name}"
+    eks_client = boto3.client('eks')
+    try:
+        response = eks_client.describe_nodegroup(clusterName=cluster_name, nodegroupName=nodegroup_name)
+        return response['nodegroup']['status']
+    except ClientError as e:
+        return 'Not Active'
+
+
+def get_eks_status(cluster_name: str) -> dict:
+    """
+    Return the status of a EKS cluster.
+
+    Args:
+        cluster_name: cluster name
+
+    Returns:
+        status dict of the response or exception dict
+    """
+    eks_client = boto3.client('eks')
+    try:
+        response = eks_client.describe_cluster(name=cluster_name)
+    except ClientError as c_e:
+        return 'Not Active'
+
+    return response['cluster']['status']
+
+
+def create_namespace(namespace: str, arcade_name: str) -> bool:
+    """Creates Kubernetes Namespace
+
+    Args:
+        namespace (str): name of the namespace
+        arcade_name (str): name of the arcade
+
+    Returns:
+        bool: Returns True if the namespace was created, False if there is a failure
+    """
+    try:
+        k8s.load_arcade_k8s_config(arcade_name)
+    except ClientError:
+        return False
+    
+    core_v1 = client.CoreV1Api()
+    try:
+        core_v1.create_namespace(client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace)))
+        return True
+    except ApiException:
+        return False
+
+
+def create_aws_prometheus(arcade_name: str) -> bool:
+    """Created ARCADE AWS Managed Prometheus based on the Arcade Name
+
+    Args:
+        arcade_name (str): Name of the Arcade
+
+    Returns:
+        bool: True if ARDADE DB was created, False if it exist or failed to create
+    """
+    client = boto3.client('ARCADE')
+    if find_prometheus_workspaces(arcade_name=arcade_name):
+        logging.info('Workspace Already Present')
+        return False
+    else:
+        response = client.create_workspace(alias=f'prometheus-{arcade_name}')
+        return True   
+
+
+def create_grafana(arcade_name: str) -> bool:
+    """Creates Aws managed Grafana
+
+    Args:
+        arcade_name (str): Name of the Arcade
+
+    Returns:
+        bool: True if Grafana was created, False if it exist or failed to create
+    """
+    client = boto3.client('grafana')
+    if find_grafana_workspaces(arcade_name=arcade_name):
+        logging.info('Workspace Already Present')
+        return False
+    else:
+        response = client.create_workspace(
+            workspaceName=f'{arcade_name}-grafana',
+            accountAccessType='CURRENT_ACCOUNT',
+            authenticationProviders=['AWS_SSO'],
+            permissionType='SERVICE_MANAGED',
+            stackSetName=f'grafana-{arcade_name}',
+            workspaceDataSources=[
+                'PROMETHEUS'
+            ],
+            workspaceRoleArn=create_grafana_role(arcade_name=arcade_name))
+        
+        # TODO Find groups instead of users. This is temporary
+        # TODO Need to figure out how to get Group ID for SSO
+        # create_users = client.update_permissions(
+        #     updateInstructionBatch=[
+        #         {
+        #             'action': 'ADD',
+        #             'role': 'ADMIN',
+        #             'users': [
+        #                 {
+        #                     'id': 'tyler.jones@addepar.com',
+        #                     'type': 'SSO_USER'
+        #                 },
+        #             ]
+        #         },
+        #     ],
+        # workspaceId=response['workspace']['id']
+        # )
+        
+        return True
+
+
+def main():
+    """Creates all Prometheus/Grafana Resources for a given Arcade
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("-p", "--path", help="Full path to filename in s3", required=True)
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(1)
+
+    arcade_name = args.arcade
+    
+    session = boto3.session.Session()
+    
+    eks_cluster = eks.arcade_to_cluster_name(arcade_name=arcade_name)
+    
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+        
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    
+    if not gsd_data:
+        sys.exit(1)
+    
+    pprint(gsd_data)
+    
+    # Check to make sure EKS cluster is Active
+    eks_status_list = []
+    offical_status = get_eks_status(cluster_name=eks_cluster)
+    eks_status_list.insert(0, str(offical_status))
+    
+    while eks_status_list[0] != 'ACTIVE':
+        time.sleep(5)
+        new_status = get_eks_status(cluster_name=eks_cluster)
+        
+        if eks_status_list[0] == 'Not Active':
+            logging.info('Not Active')
+            eks_status_list.insert(0, str(new_status))
+            continue
+        if eks_status_list[0] == 'CREATING':
+            eks_status_list.insert(0, str(new_status))
+            logging.info('Creating')
+            continue
+        if eks_status_list[0] == 'ACTIVE':
+            logging.info('Active')
+            break
+        if eks_status_list[0] == 'PENDING':
+            eks_status_list.insert(0, str(new_status))
+            logging.info('PENDING')
+            continue
+        if eks_status_list[0] == 'UPDATING':
+            eks_status_list.insert(0, str(new_status))
+            logging.info('UPDATING')
+            continue
+    
+    # Check to see if nodegroups are active 
+    nodegroup_status_list = []
+    offical_nodegroup_status = get_nodegroup_status(cluster_name=eks_cluster, arcade_name=arcade_name)
+    nodegroup_status_list.insert(0, str(offical_nodegroup_status))
+    
+    while nodegroup_status_list[0] != 'ACTIVE':
+        time.sleep(5)
+        new_nodegroup_status = get_nodegroup_status(cluster_name=eks_cluster, arcade_name=arcade_name)
+        
+        if nodegroup_status_list[0] == 'Not Active':
+            logging.info('nodegroup is not active')
+            nodegroup_status_list.insert(0, str(new_nodegroup_status))
+            continue
+        if nodegroup_status_list[0] == 'CREATING':
+            logging.info('nodegroup is creating')
+            nodegroup_status_list.insert(0, str(new_nodegroup_status))
+            continue
+        if nodegroup_status_list[0] == 'UPDATING':
+            logging.info('nodegroup is updating')
+            nodegroup_status_list.insert(0, str(new_nodegroup_status))
+            continue
+        if nodegroup_status_list[0] == 'ACTIVE':
+            logging.info('nodegroup is active')
+            break
+        
+    
+    # Start installing prometheus and grafana
+    if not create_grafana(arcade_name=arcade_name):
+        check_if_present = check_if_grafana(arcade_name=arcade_name)
+        if check_if_present:
+            pass
+        else:
+            logging.info('AWS Grafana Workspace failed to create or it is already present')
+            sys.exit(1)
+    
+    time.sleep(30)
+    
+    # Create AWS Prometheus
+    if not create_aws_prometheus(arcade_name=arcade_name):
+        check_prometheus = find_prometheus_workspaces(arcade_name=arcade_name)
+        if check_prometheus:
+            pass
+        else:
+            logging.info('AWS Prometheus Workspace failed to create or it is already present')
+            sys.exit(1)
+    
+    time.sleep(60)
+    # Sleep for a few and set the context
+    k8s.load_arcade_k8s_config(arcade_name)
+    
+    # Create Prometheus NameSpace
+    if not create_namespace(namespace='prometheus', arcade_name=arcade_name):
+        check_namespace = namespace_present(arcade_name=arcade_name, namespace='prometheus')
+        if check_namespace:
+            pass
+        else:
+            logging.info('Namespace already present')
+            sys.exit(1)
+    
+    # Create OICD Connection to EKS Cluster
+    if not create_oicd_prometheus(arcade_name=arcade_name):
+        check_oicd = get_oicd_arn(arcade_name=arcade_name)
+        if check_oicd[0]:
+            pass
+        else:
+            logging.info('OICD failed to create or it is already present')
+            sys.exit(1)
+    
+    # Apply Prometheus ConfigMap    
+    if not apply_prometheus_configmap(arcade_name=arcade_name):
+        logging.info('Configmap failed to be applied')
+        sys.exit(1)
+    
+    # Apply Service Accounts Prometheus
+    if not apply_prometheus_service_accounts(arcade_name=arcade_name):
+        logging.info('Service Accounts failed to apply')
+        sys.exit(1)
+    
+    # Apply Prometheus Daemonset    
+    if not apply_prometheus_daemonset(arcade_name=arcade_name):
+        logging.info('Daemonset Failed')
+        sys.exit(1)
+    
+    # Prometheus Deployment
+    if not apply_prometheus_deployment(arcade_name=arcade_name):
+        logging.info('Deployement Failed')
+        sys.exit(1)
+    
+    # Prometheus Statefulset
+    if not apply_prometheus_statefuleset(arcade_name=arcade_name):
+        logging.info('Statefulset failed')
+        sys.exit(1)
+    
+    # Prometheus Services
+    if not apply_prometheus_service(arcade_name=arcade_name):
+        logging.info('Service Failed')
+        sys.exit(1)
+    
+    # Prometheus Cluster Role
+    if not apply_prometheus_cluster_role(arcade_name=arcade_name):
+        logging.info('ClusterRole Failed')
+        sys.exit(1)
+    
+    # Prometheus Cluster Role Bindings
+    if not apply_cr_bindings(arcade_name=arcade_name):
+        logging.info('ClusterRole Bindings Failed')
+        sys.exit(1)
+    
+    # Get Grafana URL
+    status_list = []
+    status = get_grafana_status(arcade_name=arcade_name)
+    status_list.insert(0, str(status))
+    while status_list[0] == 'CREATING':
+        time.sleep(5)
+        new_status = get_grafana_status(arcade_name=arcade_name)
+        if status_list[0] == 'CREATING':
+            status_list.insert(0, str(new_status))
+            continue
+        if status_list[0] == 'ACTIVE':
+            if get_grafana_url(arcade_name=arcade_name) == '':
+                logging.info('Grafana URL not present')
+                sys.exit(1)
+            else:
+                grafana_url = get_grafana_url(arcade_name=arcade_name)
+                print(f'Grafana URL: {grafana_url}', file=sys.stdout)
+                break
+        else:
+            continue
+    
+    
+    sys.exit(0)
+    
+
+if __name__ == '__main__':
+    main()

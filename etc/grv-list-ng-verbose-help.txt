@@ -1,0 +1,43 @@
+
+grv-list-ng
+
+grv-list-ng is a tool to list GRVs. By default the tools searches the
+preferred regions (ie. us-east-1, us-east-2, us-west-1, us-west-2). The
+tool also allows the searched to narrowed to specific regions using the 
+-r option. The option, -o, allows the search to user names.
+
+Examples:
+    ./grv-list-ng -r us-west-1 us-west-2
+    ./grv-list-ng -o bob.dobbs
+    ./grv-list-ng -p -o bob.dobbs
+
+The options are:
+
+  * -a, --all
+     - Search all the the AWS regions.
+
+  * -j, --json
+     - The output is an unformatted json, not easily read by humans
+
+  * -J, --JSON
+     - The output is a formatted json, human readable. 
+
+  * -o, --owner <owner name>
+
+  * -p, --preferred
+     - This option causes the preferred regions (us-east-1, us-east-2,
+       us-west-1, us-west-2) to be searched. This is the default 
+       option for regions.
+
+  * -r, --region <list of regions>
+
+  * -u, --usage
+     - Printd this message.
+  
+  * -v, --version
+     - Prints out the version on this tool
+
+
+
+
+

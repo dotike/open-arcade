@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+galagazero-create -- GALAGA create the ARCADE/Account infrastructure components.
+'''
+
+# @depends: boto3, python (>=3.9)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Create the ARCADE/Account infrastructure components"
+
+
+import argparse
+import json
+import logging
+import os
+from pprint import pprint
+import sys
+import time
+
+from arclib import common
+from arclib import grv
+from arclib import log
+from arclib import secrets_manager
+from arclib import storage
+
+
+def setup_super_service(arcade_name: str, gsd_data: dict) -> bool:
+    # TODO: return True right away until we get this confirmed.
+    return True
+
+    session = common.setup_arcade_session(arcade_name)
+    get_local_account_num = session.client('sts').get_caller_identity().get('Account')
+    ACCOUNT_NUMBER = os.getenv('GALAGA_SUPER_SERVICE_ACCOUNT')
+    SUPER_SERVICE_ROLE_NAME = os.getenv('GALAGA_SUPER_SERVICE_ROLE_NAME')
+    SUPER_SERVICE_PREFIX = os.getenv('GALAGA_SUPER_SERVICE_PREFIX')
+    ASSUME_ROLE_POLICY = {
+        "Version": "2012-10-17",
+        "Statement": {
+            "Effect": "Allow",
+            "Action": "sts:AssumeRole",
+            "Resource": f"arn:aws:iam::{ACCOUNT_NUMBER}:role/{SUPER_SERVICE_ROLE_NAME}"
+        }
+    }
+
+    grv.create_policy(policy_name=f"{arcade_name.split('.')[0]}-SecretsManagerSS",
+                      policy_document=ASSUME_ROLE_POLICY)
+    attach = grv.attach_policy_to_group(arcade_name=arcade_name,
+                                        componet='SecretsManagerSS',
+                                        group_name='admins')
+
+    if attach:
+        # Execute Sync may not be needed, will do some testing. If lambda handles this then no need.
+        # execute_sync = secrets_manager.SecretsMangerSync(arcade_name=arcade_name, account_number=ACCOUNT_NUMBER,
+                                                    # role=SUPER_SERVICE_ROLE_NAME, prefix=SUPER_SERVICE_PREFIX)
+        execute_sync = True
+
+        if execute_sync:
+            logging.info(execute_sync)
+
+            create_sync_role_cross_account = secrets_manager.lambda_roles_sync(super_service_account=ACCOUNT_NUMBER, super_service_role_name=SUPER_SERVICE_ROLE_NAME)
+            time.sleep(10)
+            logging.info(create_sync_role_cross_account)
+
+            if create_sync_role_cross_account:
+                publish_lambda = secrets_manager.lambda_publish(session=session,
+                                                                arcade_name=arcade_name,
+                                                                function_name='secrets_manager_sync',
+                                                                zip_file_name='secrets_manager_sync.zip',
+                                                                timeout=120,
+                                                                memorysize=128,
+                                                                runtime='python3.9',
+                                                                role=f'arn:aws:iam::{get_local_account_num}:role/LambdaSSRoleExecution',
+                                                                description='Secrets Manger Sync Cron')
+                logging.info(publish_lambda)
+
+                if publish_lambda:
+
+                    event_data = {
+                        "account_number": ACCOUNT_NUMBER,
+                        "role": SUPER_SERVICE_ROLE_NAME,
+                        "prefix": SUPER_SERVICE_PREFIX,
+                        "arcade_name": arcade_name
+                    }
+
+                    get_lambda_arn = secrets_manager.find_lambda_arn(f"{arcade_name.split('.')[0]}-secrets_manager_sync")
+                    add_event_cron = secrets_manager.create_lambda_event(event_name=f"{arcade_name.split('.')[0]}-secrets_manager_sync", arcade_name=arcade_name, rate='rate(2 minutes)', target_arn=get_lambda_arn, event_input=json.dumps(event_data))
+                    add_source_event = secrets_manager.add_source_event_to_lambda(arcade_name=arcade_name, function_name='secrets_manager_sync', action='lambda:InvokeFunction', principal='events.amazonaws.com', source_arn=add_event_cron[1])
+                    logging.info(add_event_cron)
+                    if add_event_cron[0]:
+                        if add_source_event:
+                            sys.exit(0)
+                        else:
+                            sys.exit(1)
+                    else:
+                        sys.exit(1)
+
+                else:
+                    sys.exit(1)
+
+            else:
+                logging.info(create_sync_role_cross_account)
+                logging.info('Failed to create execution Role')
+                sys.exit(1)
+        else:
+            logging.info(execute_sync)
+            sys.exit(1)
+    else:
+        logging.info(attach)
+        sys.exit(1)
+
+
+def create_arcade_parameterstore(arcade_name: str,
+                                 gsd_data: dict) -> bool:
+    """
+    Create the ARCADE parameterstore.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    MANAGED_POLICY = {
+        "Version": "2012-10-17",
+        "Statement": {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:PutParameter",
+                "ssm:DeleteParameter",
+                "ssm:GetParameterHistory",
+                "ssm:GetParametersByPath",
+                "ssm:GetParameters",
+                "ssm:GetParameter",
+                "ssm:DeleteParameters",
+                "ssm:DescribeParameters",
+                "sts:AssumeRoleWithWebIdentity"
+            ],
+            "Resource": "*"
+        }
+    }
+
+    session = common.setup_arcade_session(arcade_name)
+    iam_client = session.client('iam')
+    arcade_trim = arcade_name.split('.')[0]
+    if not grv.check_if_arcade_policy(arcade_name, 'parameterstore'):
+        logging.info("Creating parameterstore policy")
+        try:
+            response = iam_client.create_policy(
+                PolicyName=f"{arcade_trim}-parameterstore",
+                PolicyDocument=json.dumps(MANAGED_POLICY))
+            logging.info(response)
+        except iam_client.exceptions.EntityAlreadyExistsException as c_e:
+            logging.info(c_e)
+            return False
+
+    return True
+
+
+def main():
+    """
+    %(prog)s - GALAGA create the ARCADE/Account infrastructure components.
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path to filename in s3")
+
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(1)
+    arcade_name = args.arcade
+
+    session = common.setup_arcade_session(arcade_name)
+
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+
+    if args.path:
+        gsd_data = storage.s3_json_to_dict(session, bucket, f"{args.path}")
+        if not gsd_data:
+            sys.exit(1)
+    else:
+        gsd_data = {
+                    "name": "galagazero",
+                    "component_type": "galagazero",
+                    "version": 1,
+                    "description": "Data for GALAGA zero",
+                    "services": {
+                        "parameterstore": {
+                            "service_options": {}
+                        }
+                    }
+                   }
+
+    pprint(gsd_data)
+
+    if not create_arcade_parameterstore(arcade_name, gsd_data):
+        logging.info("Create ARCADE parameterstore failed.")
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,20 @@
+{
+    "service": "rdsservice",
+    "description": "RDS database",
+    "version": 1,
+    "component_type": "rds",
+    "containers": [
+       {
+           "name": "rdservicetest",
+           "instance_type": "db.m4.large",
+           "storage": 25,
+           "engine": "mysql",
+           "engine_version": "8.0.23",
+           "username": "admin",
+           "multiAZ": false
+       }
+    ],
+    "service_options": {
+       "alerting": true
+    }
+}

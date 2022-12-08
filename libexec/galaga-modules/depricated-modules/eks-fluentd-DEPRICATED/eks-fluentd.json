@@ -1,0 +1,12 @@
+{
+    "name": "eks-fluentd",
+    "component_type": "eks-fluentd",
+    "version": 2,
+    "description": "GSD for eks-fluentd",
+    "services": {
+      "fluentd": {
+        "service_options": {}
+      }
+    }
+  }
+  

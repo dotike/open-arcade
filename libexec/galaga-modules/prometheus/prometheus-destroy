@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+import argparse
+import logging
+import os
+import boto3
+import sys
+from arclib import log, common, k8s
+from arclib import storage
+from pprint import pprint
+from kubernetes.client.rest import ApiException
+from kubernetes import client, config
+from botocore.exceptions import ClientError
+
+from prometheus_grafana import get_aws_prometheus_workspace_id, get_oicd_arn
+
+
+def delete_namespace(namespace: str, arcade_name: str) -> bool:
+    """Deletes a Kubernetes Namespace
+
+    Args:
+        namespace (str): name of the namespace
+        arcade_name (str): name of the arcade
+
+    Returns:
+        bool: True if namespace was removed, False if not.
+    """
+    try:
+        k8s.load_arcade_k8s_config(arcade_name)
+    except ClientError:
+        return False
+    
+    core_v1 = client.CoreV1Api()
+    
+    try:
+        delete_namespace = core_v1.delete_namespace(name=namespace)
+        return True
+    except ApiException:
+        return False
+
+
+def delete_aws_prometheus(arcade_name: str) -> bool:
+    """Deletes AWS Managed Prometheus
+
+    Args:
+        arcade_name (str): Name of the arcade
+
+    Returns:
+        bool: True if Prometheus was deleted, False if not
+    """
+    try:
+        get_workspace_id = get_aws_prometheus_workspace_id(arcade_name=arcade_name)
+        w_id = get_workspace_id.split('/')[4]
+        client = boto3.client('ARCADE')
+        client.delete_workspace(workspaceId=w_id)
+        return True
+    except IndexError:
+        return False
+    
+
+def delete_aws_grafana(arcade_name: str) -> bool:
+    """Deletes AWS managed Grafana
+
+    Args:
+        arcade_name (str): Name of the arcade
+
+    Returns:
+        bool: True if Grafana was deleted, False if not
+    """
+    try:
+        client = boto3.client('grafana')
+        response = client.list_workspaces()
+        for x in response['workspaces']:
+            if f'{arcade_name}-grafana' in x['name']:
+                workspace_id = x['id']
+
+        client.delete_workspace(workspaceId=workspace_id)
+        return True
+    except:
+        return False
+
+
+def delete_oicd_provider(arcade_name: str) -> bool:
+    """Deletes OICD provider in AWS
+
+    Args:
+        arcade_name (str): Name of the arcade
+
+    Returns:
+        bool: True if OICD was deleted, False if not
+    """
+    oicd_arn = get_oicd_arn(arcade_name=arcade_name)
+    if oicd_arn[0]:
+        client = boto3.client('iam')
+        try:
+            client.delete_open_id_connect_provider(OpenIDConnectProviderArn=oicd_arn[1])
+            return True
+        except client.exceptions.NoSuchEntityException:
+            return False
+    else:
+        return False
+    
+    
+def detach_polices_role(arcade_name: str) -> bool:
+    """Detaches the Prometheus Polices from the roles
+
+    Args:
+        arcade_name (str): Name of the arcade
+
+    Returns:
+        bool: True if polices were detached, False if not
+    """
+    status = False
+    account_id = boto3.client('sts').get_caller_identity().get('Account')
+    role_policy_dict = {
+        f'{arcade_name}-EKS-ARCADE-ServiceAccount-Role': f'{arcade_name}-PrometheusWriteAccessPolicy',
+        f'{arcade_name}-graphana-role': f'{arcade_name}-GraphanaWriteAccessPolicy'
+    }
+    client = boto3.client('iam')
+    for role, policy in role_policy_dict.items():
+        try:
+            response = client.detach_role_policy(RoleName=role, PolicyArn=f"arn:aws:iam::{account_id}:policy/{policy}")
+            status = True
+        except client.exceptions.NoSuchEntityException:
+            status = False
+    
+    return status
+
+
+def delete_roles_policies(arcade_name: str) -> bool:
+    """Deletes/Detaches Roles and polices for Prometheus and Grafana
+
+    Args:
+        arcade_name (str): Name of the Arcade
+
+    Returns:
+        bool: True if polices/roles were deleted, False if not
+    """
+    
+    status = False
+    account_id = boto3.client('sts').get_caller_identity().get('Account')
+    list_of_roles_to_del = [f'{arcade_name}-EKS-ARCADE-ServiceAccount-Role', f'{arcade_name}-graphana-role']
+    list_of_polices_to_del = [f'{arcade_name}-PrometheusWriteAccessPolicy', f'{arcade_name}-GraphanaWriteAccessPolicy']
+    client = boto3.client('iam')
+    
+    for role in list_of_roles_to_del:
+        try:
+            client.delete_role(RoleName=role)
+            status = True
+        except client.exceptions.NoSuchEntityException:
+            status = False
+
+    for policy in list_of_polices_to_del:
+        try:
+            client.delete_policy(PolicyArn=f'arn:aws:iam::{account_id}:policy/{policy}')
+            status = True
+        except client.exceptions.NoSuchEntityException:
+            status = False
+            
+    return status
+
+
+def main():
+    """Destroys all Prometheus/Grafana Resources with a given arcade name
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("-p", "--path", help="Full path to filename in s3", required=True)
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+    
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(1)
+            
+    arcade_name = args.arcade
+    
+    session = boto3.session.Session()
+    
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+        
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    logging.info(gsd_data)
+    
+    # Delete AWS managed Grafana
+    if not delete_aws_grafana(arcade_name=arcade_name):
+        logging.info('Workspace does not exist or failed to delete')
+        sys.exit(1)
+    
+    # Delete AMP AWS Managed Promethus
+    if not delete_aws_prometheus(arcade_name=arcade_name):
+        logging.info('Aws Prometheus does not exist or is already deleted')
+        sys.exit(1)
+    
+    # Delete namespace/resources in EKS for Prometheus
+    if not delete_namespace(namespace='prometheus', arcade_name=arcade_name):
+        logging.info('Prometheus namespace failed to delete or EKS is not present')
+    
+    # Delete OICD Provider for EKS
+    if not delete_oicd_provider(arcade_name=arcade_name):
+        logging.info('OICD provider is already deleted or failed to delete')
+        sys.exit(1)
+    
+    # Delete Roles
+    if not detach_polices_role(arcade_name=arcade_name):
+        logging.info('Failed to Detach Polices')
+        sys.exit(1)
+    
+    # Delete Polices
+    if not delete_roles_policies(arcade_name=arcade_name):
+        logging.info('Roles and Polices is already deleted or failed to delete')
+        sys.exit(1)
+    
+
+    sys.exit(0)
+    
+if __name__ == '__main__':
+    main()

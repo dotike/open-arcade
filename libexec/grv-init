@@ -1,0 +1,476 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+grv-init -- initalize a new AWS account.
+
+Set the stage for grv creation, testing first to ensure our account is sane.
+
+# TODO: apply roles to prevent any user except root from deleting the info zone.
+# TODO: this is the only utility which can be run using root credentials.
+# TODO: drop grv-admin role into account, (enabling all other tools).
+# TODO: validate/setup CloudTrail to log all account operations
+#    - only root account credentials can create (and thereby delete)
+
+# TODO Nice to haves:
+# EIP limits check, increase messaging.
+# VPC limits check, increase messaging.
+# - CreateReusableDelegationSet, can work in concert with DHCP object for VPCs.
+'''
+
+# @depends: boto3, python (>=3.7)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Initalize or re-initalize an AWS account for grv use."
+
+import os
+import sys
+import time
+from getpass import getpass
+import boto3
+from arclib import grv as grv
+
+grv_conf = grv.source(str(os.environ['MYHIER'] + '/etc/grv.conf'))
+info_zone = 'info'
+# must be unique to the runtime of this program, used for AWS retries
+unique = '{0}.{1}'.format(str(time.time()), os.environ['USER'])
+info_zone_warning = "WARNING: Do not remove, contains grv state data for this AWS account."
+_me = os.path.basename(sys.argv[0])
+
+
+def _write_info_zone(info_tld=None, unique=unique, retry_count=0):
+    info_zone_warning = "WARNING: Do not remove, contains grv state data for this AWS account."
+    try:
+        w_client = boto3.client('route53')
+        w_client.create_hosted_zone(
+            Name=info_tld,
+            CallerReference=unique,
+            HostedZoneConfig={
+                'Comment': info_zone_warning,
+                'PrivateZone': False,
+            },
+        )
+    except Exception as err:
+        if retry_count > 0:
+            time.sleep(float(grv_conf['aws_retry_timeout']))
+            retry_count = retry_count - 1
+            _write_info_zone(info_tld=info_tld, retry_count=retry_count)
+        else:
+            raise EnvironmentError('boto3 call: {}'.format(err))
+    except Exception as err:
+        raise type(err)(
+            '_write_info_zone() error: {}'.format(err))
+
+    return True
+
+
+def startmsg(_fdout=sys.stderr):
+    '''
+    This program has a long preamble, based on the notion that setting
+    up an AWS account does not often happen.
+
+    Args:
+        None required, this just prints.
+        _fdout - sys.stdout or sys.sterr typically
+
+    Returns:
+        prints preamble text to screen
+    '''
+    msg = '''
+##############################################################################
+# WARNING: You are about to initialize your AWS account,
+# this requires admin credentials for your account, and this process does not
+# accept AWS security tokens.
+#
+# Credentials for existing AWS accounts:
+#
+#   - Ask your administrator for access to an existing AWS account,
+#     you will need an appropriate user account and API key to continue.
+#
+#   - Use `grv test aws` to see if your API key is setup and working
+#     with your account.
+#
+#   - Read `README.md` to setup your API key on your computer, allowing
+#     you to use any grv tooling.
+#
+# For a new AWS account:
+#
+#   - Pay for a new AWS account, ask your manager to whip out a credit
+#     card and start a new account at https://aws.amazon.com/
+#
+#   - Based on network topology, your AWS account grvs may not be internally
+#     routable to existing grvs.  Consult your system administrator for
+#     guidance.
+#
+##############################################################################
+# `grv init` sets up the following AWS account bits:
+##############################################################################
+#
+# You will now be asked a brief series of questions, for each grv setup need.
+#
+# THIS PROGRAM CAN BE INTERRUPTED AND RE-RUN ANY TIME
+# (operations which follow are idempotent and isolated)
+##############################################################################
+
+          '''
+    print(msg, file=_fdout)
+
+
+def yea_nay(user_choice=''):
+    '''
+    # DEPRECATED method.
+    # New code should use arclib.cli.yes_no()
+    # This method should be left alone until we can make time to
+    # refactor this old, reliable program.
+    # arclib.cli.yes_no() is not a 1:1 match with this old code, and it's
+    # not currently worth the time to replace this method.
+
+    Process a yes/no answer from user input,
+    return True/False, die on bad input.
+    '''
+    try:
+        if user_choice.lower() in ['y', 'yes']:
+            return True
+        elif user_choice.lower() in ['n', 'no']:
+            print("Aborting, you can try again any time.")
+            return False
+        else:
+            grv.die("Bad input, you can try again any time.")
+    except Exception as err:
+        raise type(err)(
+            'yea_nay() error: {}'.format(err))
+
+
+def check_account():
+    '''
+    Checks for AWS account, and if not configured, asks user for account info.
+    '''
+    account_id = False
+
+    try:
+        account_id = grv.fetch_account_id()
+        print("You will be initalizing AWS account '{}', \n".format(
+            account_id[0]))
+        print(
+            '  https://{0}.signin.aws.amazon.com/console'.format(account_id[0]))
+        if account_id[1]:
+            print('    - also reachable via,')
+            for account_alias in account_id[1]:
+                print(
+                    '  https://{0}.signin.aws.amazon.com/console'.format(account_alias))
+        print('')
+    except Exception as err:
+        grv.die(
+            "Account credentials check failed.  Please check your account credentials and try again.")
+
+    return account_id
+
+
+def set_tld_zone(firstrun=True):
+    '''
+    Checks and set for TLD zone.
+    '''
+    info_zone = None
+    try:
+        info_tld = "info.{}".format(grv_conf['grv_tld'])
+        print("\nChecking AWS for Route53 domain '{}'".format(info_tld))
+        info_zone = grv.list_dns_zones(info_tld)
+        print("'{}' exists, moving on.".format(info_tld))
+    except ValueError as err:
+        print("There is no '{}' internal domain.".format(info_tld))
+        print("This zone controls grv build information for this account.")
+        print('')
+        grv.redirect('stdout')
+        r53msg = "Do you wish to create Route53 zone '{}' for AWS account '{}' now? [y/n] ".format(
+            info_tld, grv.fetch_account_id()[0])
+        sys.stdout.write(r53msg)
+        if yea_nay(input()):
+            # create the info zone if it does not appear to exist,
+            _write_info_zone(info_tld=info_tld,
+                             retry_count=int(grv_conf['aws_retry_count']))
+            if firstrun:
+                set_tld_zone(firstrun=False)
+        else:
+            sys.exit(0)
+
+    except Exception as err:
+        raise type(err)('set_tld_zone(): {}'.format(err))
+
+    return info_zone
+
+
+def add_grv_names():
+    '''
+    Checks and sets available grv names.
+    '''
+    info_zone = f"info.{grv_conf['grv_tld']}"
+    nameslist = []
+    namesfile = str(os.environ['MYHIER'] + '/etc/grv_256_names.txt')
+    _exit_message = ''
+    print('')
+    try:
+        with open(namesfile) as namefile:
+            for grvname in namefile:
+                grvname = grvname.strip()
+                if not grvname == '':
+                    grv.upsert_list(nameslist, grvname.strip())
+        namefile.close()
+
+        print("This step will set {0} predetermined grv names for future use, from the file".format(
+            len(nameslist)))
+        print("  '{1}'".format(len(nameslist), namesfile))
+        print("")
+        print("If you have set them here before, that's OK, you will be given the chance to set the names again.")
+        print("")
+        print('These names are used as the domain name for each grv, and grv_name.')
+        print('Adding names now will not create any actual zones, but, adding this list will reset the list of possible names when creating new grvs in this account.  If you are adding new names, old ones will not be deleted- but matching new/old names will be overwritten with new date-stamps.')
+
+        zones_used = len(list(grv.list_dns_zones().keys()))
+        lclient = boto3.client('route53')
+        lresponse = lclient.get_account_limit(Type='MAX_HOSTED_ZONES_BY_OWNER')
+
+        print('')
+        print("{} of a maximum {} hosted zone limit, are currently used by this account.".format(
+            zones_used, lresponse['Limit']['Value']))
+
+        existing_grvnames = grv.list_dns_names(
+            name=f"*.grvname.{info_zone}", zone=info_zone, dns_type='TXT')['names']
+
+        print(f"There are {len(existing_grvnames)} existing grv names in this account, ('*.grvname.{info_zone}').")
+
+        if len(nameslist) != len(existing_grvnames) and len(existing_grvnames) >= 1:
+            print("")
+            print("You have {0} existing grvnames in this account, and are about to upsert {1} grvnames.".format(
+                len(existing_grvnames), len(nameslist)))
+            sys.stdout.write(
+                "Do you wish to proceed adding grv names, (no will bypass and continue to next step)? [y/n] ")
+            if not yea_nay(input()):
+                print("")
+                print("BYPASS: adding predetermined grv names.")
+                return True
+
+        elif len(nameslist) == len(existing_grvnames):
+            print("")
+            print("You have {0} existing, and {1} new grvnames.  This program does not verify if the names match.".format(
+                len(existing_grvnames), len(nameslist)))
+            sys.stdout.write(
+                "Do you want to assume they match, and  bypass this time-consuming step? [y/n] ")
+            if yea_nay(input()):
+                print("")
+                print(
+                    "BYPASS: adding predetermined grv names: local/remote counts match.")
+                return True
+
+        if len(nameslist) != 256:
+            print('')
+            print("Expected 256 new names, but got {0} names from '{1}'.".format(
+                len(nameslist), namesfile))
+            sys.stdout.write('Are you sure you want to proceed? [y/n] ')
+            if not yea_nay(input()):
+                sys.exit(0)
+
+        if zones_used + len(nameslist) >= lresponse['Limit']['Value']:
+            print('')
+            print(
+                "WARNING: the names list you are adding overprovisions zone names for future use.")
+
+        print('')
+        sys.stdout.write(
+            'Are you sure you want to add {} grv names now? [y/n] '.format(len(nameslist)))
+        if yea_nay(input()):
+            print('')
+            _info_tld = "info.{}".format(grv_conf['grv_tld'])
+            _zone_id = grv.tld_to_zone_id(_info_tld)
+            batch_comment = '"a-init {}"'.format(
+                time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime()))
+
+            for grv_name in nameslist:
+                _add_name = "{0}.grvname.{1}".format(grv_name, _info_tld)
+                r53conn = boto3.client('route53')
+                zresponse = r53conn.change_resource_record_sets(
+                    HostedZoneId=_zone_id,
+                    ChangeBatch={
+                        'Comment': batch_comment,
+                        'Changes': [
+                            {
+                                'Action': 'UPSERT',
+                                'ResourceRecordSet': {
+                                    'Name': _add_name,
+                                    'Type': 'TXT',
+                                    'TTL': 300,
+                                    'ResourceRecords': [
+                                        {'Value': batch_comment},
+                                    ],
+                                },
+                            },
+                        ],
+                    }
+                )
+                print("  UPSERT {} http{}: '{}'".format(
+                      zresponse['ChangeInfo']['Status'],
+                      zresponse['ResponseMetadata']['HTTPStatusCode'],
+                      _add_name,
+                      ))
+                time.sleep(float(grv_conf['aws_retry_timeout']))
+
+        else:
+            sys.exit(0)
+
+    except Exception as err:
+        raise ValueError(err)
+    print('')
+    print('Finished setting predetermined grv names.')
+    return True
+
+
+def add_grv_supernets():
+    '''
+    Checks and sets predetermined grv netblocks.
+    '''
+    print("This step will set predetermined grv netblocks for future use, generated from the configuration in 'grv_netbase.conf'.")
+    print("")
+    print("If you have set these netblocks here before, that's OK, you will be given the chance to set the names again.")
+    print("")
+    print('These networks blocks used as the for each grv, matched to a grv_name when creating a grv.')
+    print('If you are adding new names, old ones will not be deleted- but matching new/old networks will be overwritten with new date-stamps.')
+
+    info_zone = f"info.{grv_conf['grv_tld']}"
+    grv_nets_list = []
+    available_names = []
+    all_grvnets = []
+
+    print("")
+    print("NOTE: we should have already checked for info zone, and maximum account zones, when handling 'grvname' records")
+
+    try:
+        grv_nets_gen = grv.grvs_usable_supernets()
+
+        for grv_super in grv_nets_gen:
+            grv.upsert_list(grv_nets_list, grv_super.strip())
+
+        info_stack = grv.list_dns_names(
+            zone=info_zone, dns_type='TXT')['names']
+        for txt_record in info_stack:
+            # Only grabs the first line of the TXT record, (AWS route53 returns as separate records),
+            if txt_record['Name'].endswith("grvnet.{}.".format(info_zone)):
+                grv.upsert_list(all_grvnets,
+                                {txt_record['Name']: txt_record['ResourceRecords'][0]['Value']}
+                                )
+
+        if len(grv_nets_list) != len(all_grvnets) and len(all_grvnets) >= 1:
+            print("There are {0} existing grv networks pre-set for use in this account, ('*.grvnet.{1}.').".format(
+                len(all_grvnets), info_zone))
+            sys.stdout.write(
+                "Do you wish to proceed adding grv net configs, (no will bypass and continue to next step)? [y/n] ")
+            if not yea_nay(input()):
+                print("")
+                print("BYPASS: adding predetermined grv netblocks.")
+                return True
+
+        elif len(grv_nets_list) == len(all_grvnets):
+            print("")
+            print("You have {0} existing, and {1} new grvnets.  This program does not verify if the names match.".format(
+                len(grv_nets_list), len(all_grvnets)))
+            sys.stdout.write(
+                "Do you want to assume they match, and  bypass this time-consuming step? [y/n] ")
+            if yea_nay(input()):
+                print("")
+                print(
+                    "BYPASS: adding predetermined grv netblocks: local/remote counts match.")
+                return True
+
+        print('')
+        sys.stdout.write(
+            "Are you sure you want to add {} 'grvnet' grv subnets now? [y/n] ".format(len(grv_nets_list)))
+        if yea_nay(input()):
+            print('')
+            _zone_id = grv.tld_to_zone_id(info_zone)
+            batch_comment = '"a-init {}"'.format(
+                time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime()))
+            for grv_net in grv_nets_list:
+                _add_net = "{0}.grvnet.{1}".format(
+                    str(grv_net).strip().replace('/', '_'),
+                    info_zone,
+                )
+                r53conn = boto3.client('route53')
+                zresponse = r53conn.change_resource_record_sets(
+                    HostedZoneId=_zone_id,
+                    ChangeBatch={
+                        'Comment': batch_comment,
+                        'Changes': [
+                            {
+                                'Action': 'UPSERT',
+                                'ResourceRecordSet': {
+                                    'Name': _add_net,
+                                    'Type': 'TXT',
+                                    'TTL': 300,
+                                    'ResourceRecords': [
+                                        {'Value': batch_comment},
+                                    ],
+                                },
+                            },
+                        ],
+                    }
+                )
+                print("  UPSERT {} http{}: '{}'".format(
+                      zresponse['ChangeInfo']['Status'],
+                      zresponse['ResponseMetadata']['HTTPStatusCode'],
+                      _add_net,
+                      ))
+                time.sleep(float(grv_conf['aws_retry_timeout']))
+
+        else:
+            sys.exit(0)
+
+    except Exception as err:
+        raise type(err)('add_grv_supernets(): {}'.format(err))
+
+    return grv_nets_list, all_grvnets
+
+
+def public_domain_name():
+    '''
+    '''
+    message = """
+
+
+"""
+    return message
+
+
+def main(argv):
+    '''
+    TODO:
+      Fail with some good error messages explaining where to go if AWS account is not yet set up,
+        - for existing grv-aware AWS, ask an admin for access. (hook config credentials)
+        - for admins over an AWS account, where to go and put the coin in the slot.
+
+      If no AWS credentials configured, ('README.md'), then offer the choice to input
+      root credentials on-screen manually.
+
+      -y for "yes" answer to all options
+      -h for help options
+      -v if verbose options
+    '''
+    grv.redirect('stderr')
+    startmsg()
+    grv.redirect('stdout')
+    account_id = check_account()
+    # TODO IMPORTANT: notify user to create AWS ticket to request 256 VPC's per region (default is 5).
+    print('##############################################################################')
+    info_zone = set_tld_zone()
+    # Set up our templated names and netblocks in grv info zone,
+    print('##############################################################################')
+    print(add_grv_names())
+    print('##############################################################################')
+    print(add_grv_supernets())
+    print('##############################################################################')
+    print(public_domain_name())
+    print('DONE: AWS account ready for ARCADE use.')
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

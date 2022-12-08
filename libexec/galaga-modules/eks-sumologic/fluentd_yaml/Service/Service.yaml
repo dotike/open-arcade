@@ -1,0 +1,385 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-fluent-bit
+  labels:
+    helm.sh/chart: fluent-bit-0.20.2
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/instance: arcade-fluentd
+    app.kubernetes.io/version: "1.9.4"
+    app.kubernetes.io/managed-by: Helm
+    sumologic.com/scrape: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 2020
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/instance: arcade-fluentd
+---
+# Source: sumologic/charts/kube-prometheus-stack/charts/kube-state-metrics/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-kube-state-metrics
+  namespace: fluentd
+  labels:
+    app.kubernetes.io/name: kube-state-metrics
+    helm.sh/chart: "kube-state-metrics-2.9.4"
+    app.kubernetes.io/instance: "arcade-fluentd"
+    app.kubernetes.io/managed-by: "Helm"
+  annotations:
+    prometheus.io/scrape: 'true'
+spec:
+  type: "ClusterIP"
+  ports:
+  - name: "http"
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: arcade-fluentd
+---
+# Source: sumologic/charts/kube-prometheus-stack/charts/prometheus-node-exporter/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-prometheus-node-exporter
+  namespace: fluentd
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:     
+    app: prometheus-node-exporter
+    heritage: Helm
+    release: arcade-fluentd
+    chart: prometheus-node-exporter-1.12.0
+    jobLabel: node-exporter
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9200
+      targetPort: 9200
+      protocol: TCP
+      name: metrics
+  selector:
+    app: prometheus-node-exporter
+    release: arcade-fluentd
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/core-dns/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-kube-promet-coredns
+  labels:
+    app: kube-prometheus-stack-coredns
+    jobLabel: coredns
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+  namespace: kube-system
+spec:
+  clusterIP: None
+  ports:
+    - name: http-metrics
+      port: 9153
+      protocol: TCP
+      targetPort: 9153
+  selector:
+    k8s-app: kube-dns
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-controller-manager/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-kube-promet-kube-controller-manager
+  labels:
+    app: kube-prometheus-stack-kube-controller-manager
+    jobLabel: kube-controller-manager
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+  namespace: kube-system
+spec:
+  clusterIP: None
+  ports:
+    - name: http-metrics
+      port: 10252
+      protocol: TCP
+      targetPort: 10252
+  selector:
+    component: kube-controller-manager
+  type: ClusterIP
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-etcd/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-kube-promet-kube-etcd
+  labels:
+    app: kube-prometheus-stack-kube-etcd
+    jobLabel: kube-etcd
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+  namespace: kube-system
+spec:
+  clusterIP: None
+  ports:
+    - name: http-metrics
+      port: 2379
+      protocol: TCP
+      targetPort: 2379
+  selector:
+    component: etcd
+  type: ClusterIP
+---
+
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-proxy/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-kube-promet-kube-proxy
+  labels:
+    app: kube-prometheus-stack-kube-proxy
+    jobLabel: kube-proxy
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+  namespace: kube-system
+spec:
+  clusterIP: None
+  ports:
+    - name: http-metrics
+      port: 10249
+      protocol: TCP
+      targetPort: 10249
+  selector:
+    k8s-app: kube-proxy
+  type: ClusterIP
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/exporters/kube-scheduler/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-kube-promet-kube-scheduler
+  labels:
+    app: kube-prometheus-stack-kube-scheduler
+    jobLabel: kube-scheduler
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+  namespace: kube-system
+spec:
+  clusterIP: None
+  ports:
+    - name: http-metrics
+      port: 10251
+      protocol: TCP
+      targetPort: 10251
+  selector:
+    component: kube-scheduler
+  type: ClusterIP
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus-operator/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-kube-promet-operator
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-operator
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+  selector:
+    app: kube-prometheus-stack-operator
+    release: "arcade-fluentd"
+  type: "ClusterIP"
+---
+# Source: sumologic/charts/kube-prometheus-stack/templates/prometheus/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-kube-promet-prometheus
+  namespace: fluentd
+  labels:
+    app: kube-prometheus-stack-prometheus
+    self-monitor: "true"
+    
+    chart: kube-prometheus-stack-12.10.0
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  ports:
+  - name: web
+    port: 9090
+    targetPort: 9090
+  selector:
+    app: prometheus
+    prometheus: arcade-fluentd-kube-promet-prometheus
+  type: "ClusterIP"
+---
+# Source: sumologic/templates/events/common/service-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-events-headless
+  labels:
+    app: arcade-fluentd-sumologic-fluentd-events-headless
+    sumologic.com/app: fluentd-events
+    sumologic.com/component: events
+spec:
+  selector:
+    app: arcade-fluentd-sumologic-fluentd-events
+  clusterIP: None
+  ports:
+  - name: metrics
+    port: 24231
+    targetPort: 24231
+    protocol: TCP
+  - name: otelcol-metrics
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+---
+# Source: sumologic/templates/events/common/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-events
+  labels:
+    app: arcade-fluentd-sumologic-fluentd-events
+    sumologic.com/scrape: "true"
+    sumologic.com/app: fluentd-events
+    sumologic.com/component: events
+    chart: "sumologic-2.18.1"
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  selector:
+    app: arcade-fluentd-sumologic-fluentd-events
+  ports:
+  - name: metrics
+    port: 24231
+    targetPort: 24231
+    protocol: TCP
+  - name: otelcol-metrics
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+---
+# Source: sumologic/templates/logs/fluentd/service-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-logs-headless
+  labels:
+    app: arcade-fluentd-sumologic-fluentd-logs-headless
+    sumologic.com/app: fluentd-logs
+    sumologic.com/component: logs
+spec:
+  selector:
+    app: arcade-fluentd-sumologic-fluentd-logs
+  clusterIP: None
+  ports:
+  - name: fluent-bit
+    port: 24321
+    targetPort: 24321
+    protocol: TCP
+  - name: metrics
+    port: 24231
+    targetPort: 24231
+    protocol: TCP
+---
+# Source: sumologic/templates/logs/fluentd/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-logs
+  labels:
+    app: arcade-fluentd-sumologic-fluentd-logs
+    sumologic.com/scrape: "true"
+    sumologic.com/app: fluentd-logs
+    sumologic.com/component: logs
+    chart: "sumologic-2.18.1"
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  selector:
+    app: arcade-fluentd-sumologic-fluentd-logs
+  ports:
+  - name: fluent-bit
+    port: 24321
+    targetPort: 24321
+    protocol: TCP
+  - name: metrics
+    port: 24231
+    targetPort: 24231
+    protocol: TCP
+
+---
+
+# Source: sumologic/templates/metrics/fluentd/service-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-metrics-headless
+  labels:
+    app: arcade-fluentd-sumologic-fluentd-metrics-headless
+    sumologic.com/app: fluentd-metrics
+    sumologic.com/component: metrics
+spec:
+  selector:
+    app: arcade-fluentd-sumologic-fluentd-metrics
+  clusterIP: None
+  ports:
+  - name: prom-write
+    port: 9888
+    targetPort: 9888
+    protocol: TCP
+  - name: metrics
+    port: 24231
+    targetPort: 24231
+    protocol: TCP
+---
+# Source: sumologic/templates/metrics/fluentd/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-metrics
+  labels:
+    app: arcade-fluentd-sumologic-fluentd-metrics
+    sumologic.com/scrape: "true"
+    sumologic.com/app: fluentd-metrics
+    sumologic.com/component: metrics
+    chart: "sumologic-2.18.1"
+    release: "arcade-fluentd"
+    heritage: "Helm"
+spec:
+  selector:
+    app: arcade-fluentd-sumologic-fluentd-metrics
+  ports:
+  - name: prom-write
+    port: 9888
+    targetPort: 9888
+    protocol: TCP
+  - name: metrics
+    port: 24231
+    targetPort: 24231
+    protocol: TCP
+

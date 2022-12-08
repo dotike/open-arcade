@@ -1,0 +1,93 @@
+#!/bin/sh
+#
+# arcade env: Set the environment for creating an Arcade.
+#
+
+__version__="0.1"
+__author__="Addepar Infrastructure Platform Tools Team <iptools@addepar.com>"
+__description__="Print the ARCADE related environment."
+
+
+# Pop off the word "source" from the args list if it is found.
+[ "${1}" = "source" ] && shift
+
+if [ "${1}" = "-h" ]; then
+    echo "  Print the current Arcade ENV or print commands to modify it."
+    echo ""
+    echo "Usage: arcade env [-h] [<arcade_name> [<asteroid_name>]]"
+    echo ""
+    echo "  If no args are provided, just print the current env settings."
+    echo "  '-h': Print this message."
+    echo ""
+    echo "  <arcade_name>:   The name of your arcade."
+    echo "  <asteroid_name>: The name of your asteroid."
+    echo ""
+    echo "  All args are order specific."
+    echo "  If any arg is '=' or empty (specify with ''), it will be unchanged but any provided args will be set."
+    echo "  To unset an ENV var use '-' for the field."
+else
+    # Process any remaining args.
+    arg=`echo "${1}" | grep '^-.'`
+    if [ -n "${arg}" ]; then
+	echo "Unknown arg: ${arg}" 1>&2
+	exit 1
+    fi
+
+    changes=0
+    # Process the Arcade name.
+    if [ -n "${1}" ]; then
+	if [ "${1}" = '-' ]; then
+	    # Unset the Arcade name.
+	    echo unset ARCADE_NAME
+	    echo unset KUBECONFIG
+	    changes=1
+	elif [ "${1}" != '=' ]; then
+	    # Set Arcade name.
+	    # First check if the Arcade name provided is valid.
+	    match1=`echo "${1}" | grep -iE '^[a-z0-9][._a-z0-9]*\.[a-z]+$'`
+	    if [ -n "${match1}" ]; then
+		# Print the commands to set the env accordingly.
+		echo export ARCADE_NAME=${1}
+		echo export KUBECONFIG="${HOME}/.kube/${1}-config"
+		changes=1
+	    else
+		echo "ERROR: Invalid ARCADE_NAME: ${1}" 1>&2
+		echo "ERROR: An Arcade name must follow these rules:" 1>&2
+		echo "ERROR:   It must contain a dot ('.')." 1>&2
+		echo "ERROR:   It must not start or end with a dot ('.') or underscore ('_')." 1>&2
+		echo "ERROR:   It may only contain letters, numbers, dots ('.') or unserscores ('_')." 1>&2
+		echo "ERROR:   Only letters after the final dot ('.') for the TLD." 1>&2
+		exit 1
+	    fi
+	fi
+	shift
+    fi
+
+    # Process the Asteroid name.
+    if [ -n "${1}" ]; then
+	if [ "${1}" = '-' ]; then
+	    # Unset the Asteroid name.
+	    echo unset ASTEROID_NAME
+	    changes=1
+	elif [ "${1}" != '=' ]; then
+	    # First check if the Asteroid name provided is valid.
+	    match=`echo "${1}" | grep -E '^[a-z][a-z0-9]{3,23}$'`
+	    if [ -n "${match}" ]; then
+		# Print the commands to set the env accordingly.
+		echo export ASTEROID_NAME=${1}
+		changes=1
+	    else
+		echo "ERROR: Invalid ASTEROID_NAME: ${1}" 1>&2
+		echo "ERROR: An Asteroid name must match the Regex: '^[a-z][a-z0-9]{3,23}$'" 1>&2
+		exit 1
+	    fi
+	fi
+	shift
+    fi
+
+    # Report what we got.
+    if [ "${changes}" = '0' ]; then
+	echo "# Current Arcade ENV settings:"
+	env | sort | grep -iE 'arcade|asteroid|aws|bucket|path|kube'
+    fi
+fi

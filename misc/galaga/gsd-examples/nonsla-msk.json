@@ -1,0 +1,15 @@
+{
+    "name": "nonsla",
+    "component_type": "msk",
+    "version": 1,
+    "description": "Module to stand up non-sla kafka MSK",
+    "service_options": {
+        "cluster_prefix": "nonsla",
+        "instance_type": "kafka.m5.large",
+        "kafka_version": "2.6.2",
+        "ebs_size": 100,
+        "brokers_per_az": 1,
+        "cfg_auto_create_topics_enable": "true",
+        "cfg_delete_topic_enable": "true"
+    }
+}

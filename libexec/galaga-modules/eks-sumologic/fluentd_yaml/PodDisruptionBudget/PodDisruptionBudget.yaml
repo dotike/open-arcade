@@ -1,0 +1,21 @@
+# Source: sumologic/templates/logs/fluentd/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-logs-pdb
+spec:
+  selector:
+    matchLabels:
+      app: arcade-fluentd-sumologic-fluentd-logs
+  minAvailable: 2
+---
+# Source: sumologic/templates/metrics/fluentd/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: arcade-fluentd-sumologic-fluentd-metrics-pdb
+spec:
+  selector:
+    matchLabels:
+      app: arcade-fluentd-sumologic-fluentd-metrics
+  minAvailable: 2

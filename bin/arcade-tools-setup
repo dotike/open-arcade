@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# A simple setup program which prints PATH setting instructions to screen.
+
+dothere=$(cd "${0%/*}" 2>/dev/null; echo "`pwd -L`")
+arcade_prog="`which -a arcade`"
+
+if [ ! "$arcade_prog" ] ; then
+  >&2 echo "# "
+  >&2 echo "# The 'arcade' program is not in your path."
+  >&2 echo "# "
+  >&2 echo "# If you wish to merely load the arcade tools to run in your existing shell,"
+  >&2 echo "# (not for other shells), you may run:"
+  >&2 echo "# "
+  >&2 echo "#   $ export PATH=${dothere}:\$PATH"
+  >&2 echo "# "
+  >&2 echo "# To configure ARCADE tools for regular use, you can add the following "
+  >&2 echo "# line to your shell ~/.profile, ~/.bash_profile, or ~/.zprofile :"
+  >&2 echo ""
+  echo "export PATH=${dothere}:\$PATH"
+  >&2 echo ""
+
+
+else
+  if [ ! `which grv > /dev/null 2>&1` ] ; then
+    >&2 echo "#"
+    >&2 echo "# The 'arcade' program is in your PATH, ready for use:"
+    >&2 echo "#"
+    >&2 echo "#   ${arcade_prog}"
+    >&2 echo "#"
+    >&2 echo "# You may run 'arcade -h' for help. "
+  fi
+
+fi
+
+exit 0

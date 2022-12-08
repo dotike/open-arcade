@@ -1,0 +1,32 @@
+{
+  "name": "log-relay",
+  "component_type": "log-relay",
+  "version": 1,
+  "description": "Data for the log relay GALAGA",
+  "services": {
+    "asg": {
+      "service_options": {
+        "cluster_prefix": "log-relay",
+        "asg_capacity": 1,
+        "asg_max_capacity": 1,
+        "instance_type": "m5.xlarge",
+        "node_ami_name": "ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20211129",
+        "user_data_file": "log-relay.tpl",
+        "lb1_protocol": "tcp_udp",
+        "lb1_port": "514",
+        "lb1_path": "",
+        "lb2_protocol": "",
+        "lb2_port": "",
+        "lb2_path": "",
+        "vol_delete_on_termination": true,
+        "ebs_root_vol_name": "/dev/sda1",
+        "ebs_root_vol_type": "gp2",
+        "ebs_root_vol_size": 20,
+        "ebs_data_vol_name": "/dev/sdb",
+        "ebs_data_vol_type": "gp2",
+        "ebs_data_vol_size": 100,
+        "ebs_vol_encrypted": false
+      }
+    }
+  }
+}

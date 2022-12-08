@@ -1,0 +1,530 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+import os, sys
+import argparse
+import json
+from multiprocessing import Pool
+import boto3
+from arclib import common
+from arclib import grv as grv
+from arclib.cli import vprint
+
+
+# @depends: boto3, python (>=3.8)
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "List ARCADES at the base GRAVITAR layer, for a given AWS account."
+__version__ = '0.3'
+__usage__ = """
+This program lists all ARCADE enviornments, (aka GRAVITAR) enviornments in a given
+AWS account. GRAVITAR VPC's are returned, yet, this program does not list VPC's in
+which were not created by the ARCADE tools.
+
+JSON output provides through GRAVITAR detail.
+To list even more detail about a given ARCADE, (including GALAGA and ASTEROID layers),
+see `arcade inventory`.
+
+"""
+
+
+# --------------------------------------------------------------------
+#
+# main
+#
+# --------------------------------------------------------------------
+def main():
+    regions = {}
+    p_dict = {}
+    rs_defines = common.ReturnStatus()
+    version = __version__
+
+    # The minimum version of python we support is 3.8
+    min_python_version = (3, 8)
+    if sys.version_info < min_python_version:
+        print("Python %s.%s or later is required.\n" % min_python_version)
+        sys.exit(rs_defines.NOT_OK)
+
+    tool_name = os.path.basename(__file__)
+    version = __version__
+
+    parser = argparse.ArgumentParser(description=__description__,
+                                     epilog=__usage__,
+                                     prog='arcade grv list-ng',
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    """
+    -a -- All AWS regions
+    -f -- - ??
+    -g -- A single GRV - FIX
+    -h -- Print help message
+    -j -- Formatted as machine readable json
+    -J -- Formatted as human readable json
+    -c -- Creator
+    -p -- Preferred regions
+    -P -- - ??
+    -r -- User selected region(s)
+    -s -- Short list - FIX
+    -v -- verbose - FIX
+    -y -- Yes to all questions - ??
+    """
+
+    parser.add_argument('-a', '--all', help='Default behavior, search all regions for the given AWS account.',
+                        action='store_true')
+
+    parser.add_argument('-j', '--json', help='JSON format output.',
+                        action='store_true')
+
+    parser.add_argument('-J', '--JSON', help='Pretty-printed JSON output.',
+                        action='store_true')
+
+    parser.add_argument('-c', '--creator', help='List all GRVs by the IAM user which created them.')
+    # TODO: consider adding a "owner" to GRV metadata
+
+    parser.add_argument('-p', '--preferred', help='Use a reduced set of preferred regions to search.',
+                        action='store_true')
+
+    parser.add_argument('-r', '--region', help='Constrain search to a given region.',
+                        nargs='*')
+
+    parser.add_argument('-u', '--usage', help='Detailed help',
+                        action='store_true')
+
+    parser.add_argument('-v', '--version', help='The version of this tool.',
+                        action='store_true')
+
+    args = parser.parse_args()
+    p_dict['args'] = args
+
+    if args.usage:
+        r_dict = print_verbose_help("grv-list-ng-verbose-help.txt")
+        if r_dict['status'] == rs_defines.OK:
+            print(r_dict['data'])
+        sys.exit(rs_defines.OK)
+
+    # Spit out the version
+    if args.version:
+        print(f"{tool_name} - Version: {version}")
+        sys.exit(rs_defines.OK)
+
+    # Validate that aws credentials are valid
+    common.validate_aws_creds()
+
+    init_script(p_dict)
+
+    r_dict = selectRegions(p_dict)
+
+    if r_dict['status'] == rs_defines.OK:
+        p_dict = list_grvs_ng(p_dict)
+        outStr = p_dict['data']
+    else:
+        outStr = r_dict['msg']
+
+    print(outStr)
+
+    sys.exit(0)
+    # End of main
+
+
+# --------------------------------------------------------------------
+#
+# selectRegions
+#
+# --------------------------------------------------------------------
+def selectRegions(p_dict: dict):
+    """
+    Args:
+    Returns:
+    """
+
+    rs_defines = common.ReturnStatus()
+    r_dict     = common.gen_return_dict("list_grvs_ng")
+    region_found = False
+    bogus_region = ""
+
+    grv.find_unrestricted_regions(r_dict)
+    region_list = r_dict['RegionList']
+    restricted_regions = r_dict['IsRestricted']
+    
+    args = p_dict['args']
+
+    # Region
+    p_dict['cl_region'] = args.region
+
+    # All
+    p_dict['all_flag'] = args.all
+
+    # Preferred
+    p_dict['preferred_flag'] = args.preferred
+
+    # Default
+    p_dict['default_region']= current_default_region(p_dict)
+
+    p_dict['selected_region'] = ""
+
+    if p_dict['all_flag']:
+        # All regions
+        if restricted_regions:
+            p_dict['selected_region'] = region_list
+        else:
+            p_dict['selected_region'] = p_dict['all_regions']
+        region_found = True
+    elif p_dict['preferred_flag']:
+        # Preferred Regions
+        if restricted_regions:
+            p_dict['selected_region'] = region_list
+        else:
+            p_dict['selected_region'] = p_dict['preferred_regions']
+        region_found = True
+    elif p_dict['cl_region']:
+        # Specified region
+        for entry in p_dict['cl_region']:
+            if entry in p_dict['all_regions']:
+                region_found = True
+            else:
+                bogus_region = entry
+                break
+        if region_found == True:
+            if restricted_regions:
+                for entry in p_dict['cl_region']:
+                    if entry not in region_list:
+                        region_found = False
+                        r_dict['status'] = rs_defines.RESTRICTED
+                        break
+            else:
+                pass
+            if region_found == True:    
+                p_dict['selected_region'] = p_dict['cl_region']
+    else:
+        # default region
+        if restricted_regions:
+            p_dict['selected_region'] = region_list
+        else:
+            p_dict['selected_region'] = [p_dict['default_region']]
+        region_found = True
+
+    if region_found == False:
+        if r_dict['status'] == rs_defines.RESTRICTED:
+            r_dict['data'] = ""
+            r_dict['msg'] = f"\nERROR: AWS region {entry} is restricted"
+        else:
+            r_dict['status'] = rs_defines.NOT_FOUND
+            r_dict['data'] = ""
+            r_dict['msg'] = f"\nERROR: region {bogus_region} not an official AWS region"
+    else:
+        r_dict['status'] = rs_defines.OK
+
+    return r_dict
+    # End of selectRegions
+
+
+# --------------------------------------------------------------------
+#
+# aws_tags_to_dict
+#
+# --------------------------------------------------------------------
+def aws_tags_to_dict(taglist: list) -> dict:
+    """
+    This wrapper exists just give a legacy function a
+    more discriptive name
+
+    Args:
+        taglist: A list of tags
+
+    Returns:
+        r_dist: The passed in list of tags mutated into a dict
+    """
+    return grv.aws_tags_dict(taglist)
+    # End of aws_tags_to_dict
+
+
+# --------------------------------------------------------------------
+#
+# list_grvs_ng
+#
+# --------------------------------------------------------------------
+def list_grvs_ng(p_dict: dict) -> dict:
+    """
+    Args:
+    Returns:
+    """
+
+    rs_defines = common.ReturnStatus()
+    r_dict     = common.gen_return_dict("list_grvs_ng")
+    grv_list   = ""
+    vpc_list   = []
+    keyed_vpcs = {}
+
+    regionList = p_dict['selected_region']
+
+    with Pool() as p:
+        grvs = p.map(_list_grvs_in_region, regionList) # returns a list of lists 
+        # Could have done the following in one line as a list
+        # comprehension; decided against it for readability
+        for grv_list in grvs:
+            for grv in grv_list:
+                vpc_list.append(grv)
+
+    for vpc in vpc_list:
+        if not 'Tags' in vpc:
+            continue
+
+        vpc_id = vpc['VpcId']
+        keyed_vpcs[vpc_id] = vpc
+        tags = vpc['Tags']
+        keyed_vpcs[vpc_id]['TagSane'] = aws_tags_to_dict(tags)
+
+    # End of for loop
+    if len(keyed_vpcs) > 0:
+        p_dict['keyed_vpcs'] = keyed_vpcs
+        outStr = return_grvs_ng(p_dict)
+    else:
+        outStr = "\nNo GRVs found."
+
+    r_dict['status'] = rs_defines.OK
+    r_dict['data'] = outStr
+
+    return r_dict
+    # End of list_grv_ng
+
+
+# --------------------------------------------------------------------
+#
+# _list_grvs_in_region
+#
+# --------------------------------------------------------------------
+def _list_grvs_in_region(region) -> list:
+    """
+    Gets all the grvs in a given region. Abstracted from the list_grvs
+    function to make concurrency easier.
+    Args:
+        region - AWS region to get list of grvs
+        managed_list - a multiprocessing list that can be shared between
+        processes
+    Returns:
+        Grv info dict keyed by region
+    """
+    genuine_grv = [{'Name': 'tag-key', 'Values': ['grv_create_session_id']}]
+    grv.set_region(region=region)
+    vpcs = {}  # necessary since we pass on failed calls,
+    r_list = []
+    try:
+        ec2 = boto3.client('ec2', region_name=region)
+        vpcs = ec2.describe_vpcs(
+            DryRun=False, Filters=genuine_grv)['Vpcs']
+        for _eachvpc in vpcs:
+            _eachvpc['region'] = region
+            r_list.append(_eachvpc)
+    except Exception as err:
+        raise type(err)('list_grvs(): {}'.format(err))
+    return r_list
+
+# --------------------------------------------------------------------
+#
+# return_grvs_ng
+#
+# --------------------------------------------------------------------
+def return_grvs_ng(p_dict) -> str:
+    """
+    """
+    returnStr = ""
+
+    raw_return = p_dict['keyed_vpcs']
+    args = p_dict['args']
+
+    if args.creator:
+        tmp_keyed_vpcs = {}
+        for entry in raw_return:
+            tmp_dict = raw_return[entry]
+            tags = tmp_dict['Tags']
+            for tag in tags:
+                if args.creator in tag['Value']:
+                    tmp_keyed_vpcs[entry] = raw_return[entry]
+                    break
+        raw_return = tmp_keyed_vpcs
+
+    if args.JSON:
+        returnStr = json.dumps(raw_return, indent=4, sort_keys=True, default=str)
+    elif args.json:
+        returnStr = json.dumps(raw_return, sort_keys=True, default=str)
+    else:
+        account_number = boto3.client('sts').get_caller_identity().get('Account')
+
+        try:
+            # It must contain only digits, lowercase letters, and hyphens
+            # https://docs.aws.amazon.com/IAM/latest/UserGuide/console_account-alias.html
+            account_alias = boto3.client('iam').list_account_aliases()['AccountAliases'][0]
+        except:
+            account_alias = 'no_account_alias'
+
+        for grv_id, pdict in raw_return.items():
+            ptags = grv.aws_tags_dict(pdict['Tags'])
+            if 'creator' in ptags:
+                creator = ptags['creator']
+            else:
+                creator = ptags['creator']
+
+            grvline = "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}".format(
+                ptags['Name'],
+                ptags['grv_class'],
+                pdict['region'],
+                pdict['VpcId'],
+                pdict['CidrBlock'],
+                creator,
+                account_number,
+                account_alias
+                )
+            p_dict['format_return'] = p_dict['format_return'] + '\n' + grvline
+
+        returnStr = common.columnate(p_dict['format_return'])
+
+    return returnStr
+    # End of return_grvs_ng
+
+
+# --------------------------------------------------------------------
+#
+# current_default_region
+#
+# --------------------------------------------------------------------
+def current_default_region(p_dict) -> str:
+    """
+    """
+    def_region = ""
+    #
+    # Region is complicated. This is the order of precedence
+    # file : ~/.aws/config
+    # env  : AWS_DEFAULT_REGION
+    # env  : AWS_REGION
+    # CL   : -r <region>
+    #
+    #default_region = AWS_DEFAULT_REGION
+    #AWS_REGION
+
+    # file
+    s3_client = boto3.client('s3')
+    file_region = s3_client.meta.region_name
+
+    # env
+    env_ar  = os.getenv('AWS_REGION')
+    env_adr = os.getenv('AWS_DEFAULT_REGION')
+
+    # CL
+    args = p_dict['args']
+    cl_region = args.region
+
+    if file_region is not None:
+        def_region = file_region
+
+    if env_adr is not None:
+        def_region = env_adr
+
+    if env_ar is not None:
+        def_region = env_ar
+
+    if cl_region is not None:
+        def_region = cl_region
+
+    return def_region
+    # End of current_default_region
+
+
+# --------------------------------------------------------------------
+#
+# init_script
+#
+# --------------------------------------------------------------------
+def init_script(p_dict) -> dict:
+    """
+    """
+    args = p_dict['args']
+
+    try:
+        p_dict['all_regions'] = list(grv.fetch_available_regions().keys())
+
+        p_dict['format_return'] = ""
+
+        p_dict['grv_id'] = ""
+
+        grv_conf = grv.source(str(os.environ['MYHIER'] + '/etc/grv.conf'))
+        p_dict['grv_conf'] = grv_conf
+
+        PreferredRegions = grv_conf.get('aws_preferred_regions', []).split()
+        p_dict['preferred_regions'] = PreferredRegions
+
+        grv_tld = grv_conf['grv_tld']
+        p_dict['grv_tld'] = grv_tld
+
+        info_domain = 'info.{}'.format(grv_tld)
+        p_dict['info_domain'] = info_domain
+
+        tool_name = os.path.basename(__file__)
+        p_dict['tool_name'] = tool_name
+
+        p_dict['creator'] = args.creator
+    except Exception as err:
+        raise type(err)('{0}: {1}'.format(sys.argv[0], err))
+
+    return p_dict
+    # End of init_script
+
+# --------------------------------------------------------------------
+#
+# print_verebose_help
+#
+# --------------------------------------------------------------------
+def print_verbose_help(usage_file: str) -> dict:
+    """
+    This function is used in cases a verbose help is needed. An example
+    of how it can be used is
+
+        if args.usage:
+            r_dict = print_verbose_help('verbase_help.txt')
+            if r_dict['status'] == rs_defines.OK:
+                print(r_dict['msg'])
+            else:
+                # Deal with this
+
+    Args:
+        The name of a file containing a verbose usage ASCII test.
+        the assumption is the file will be in $MYHIER/etc
+
+    Returns:
+        A dict containing the return status and message which will
+        be the contents of the verbose help file.
+    """
+    rs_defines = common.ReturnStatus()
+    r_dict = common.gen_return_dict('In print_verbose_help')
+    help_msg = ''
+
+    myhier = os.getenv('MYHIER')
+    if myhier is None:
+        r_dict['msg'] = "ERROR: MYHIER not set. Try again"
+        r_dict['status'] = rs_defines.FAIL
+
+    if r_dict['status'] == rs_defines.OK:
+        verbose_help = f"{myhier}/etc/{usage_file}"
+
+        try:
+            if os.path.exists(verbose_help):
+                with open(verbose_help, 'r') as file_handle:
+                    help_msg = file_handle.read()
+                    r_dict['status'] = rs_defines.OK
+                    r_dict['data'] = help_msg
+            else:
+                r_dict['msg'] = f"ERROR: {verbose_help} NOT found."
+                r_dict['status'] = rs_defines.NOT_OK
+        except Exception as err:
+            r_dict['status'] = rs_defines.FAIL
+            r_dict['msg'] = err
+
+    return r_dict
+    # End of print_verbose_help
+
+# --------------------------------------------------------------------
+#
+# Entry point
+#
+# --------------------------------------------------------------------
+if __name__ == '__main__':
+    main()
+

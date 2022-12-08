@@ -1,0 +1,32 @@
+{
+   "service": "nginx-example",
+   "version": 1,
+   "component_type": "k8s",
+   "containers": [
+      {
+         "name": "web",
+         "image": "nginx",
+         "readiness_check_path": "/",
+         "cpu": 1,
+         "cpu_limit": 2,
+         "mem": 1024,
+         "mem_limit": 2048,
+         "port_mappings": [
+            {
+              "port": 80,
+              "port_name": "http"
+            },
+            {
+              "port": 443,
+              "port_name": "https"
+            }
+         ]
+      }
+   ],
+   "service_options": {
+      "alerting": true,
+      "desired_count": 1,
+      "load_balanced": true,
+      "public": true
+   }
+}

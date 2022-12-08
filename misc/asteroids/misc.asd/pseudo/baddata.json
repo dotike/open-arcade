@@ -1,0 +1,18 @@
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "age": "21",
+  "latitude": 148.858093,
+  "longitude": 2.294694,
+  "fruits": [ "apple", "orange", "pear" ],
+  "vegetables": [
+    {
+      "veggieName": "potato",
+      "veggieLike": true
+    },
+    {
+      "veggieName": "broccoli",
+      "veggieLike": false
+    }
+  ]
+}

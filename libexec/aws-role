@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+# @depends: boto3, python (>=3.7)
+__version__ = '0.0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Lists roles associated with the calling IAM user."
+__usage__ = """
+Used for diagnosing permsision issues for ARCADE users.
+"""
+
+
+import argparse
+import boto3
+import sys
+import json
+
+from arclib import grv as grv
+from arclib import iam as iam_general
+from arclib import storage, log, common
+
+
+def format_and_output(in_dict: dict, args):
+    if args.jsonpretty:
+        print(json.dumps(in_dict, indent=4, sort_keys=True, default=str))
+    elif args.json:
+        print(json.dumps(in_dict, sort_keys=True, default=str))
+    else:
+        grv.prettyPrint(in_dict)
+    sys.exit(0)
+
+
+def main():
+    """
+    Process args, and operate on them.
+    """
+    parser = argparse.ArgumentParser(
+        description=__description__,
+        epilog=__usage__,
+        prog='arcade aws role',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-E",
+        "--eksadminrole",
+        action='store_true',
+        help="Queries only for EKSAdminRole, exits nonzero if the user is notassigned this role."
+    )
+    parser.add_argument("-j", "--json", action='store_true', help='JSON output.')
+    parser.add_argument("-J", "--jsonpretty", action='store_true', help='PrettyPrint JSON output.')
+    #log.add_log_level_argument(parser)
+    args = parser.parse_args()
+
+    # Validate that aws credentials are valid
+    common.validate_aws_creds()
+
+    #log.set_log_level(args.verbose)
+
+    #grv.prettyPrint(iam_general.get_all_roles())
+    #print('FOOFOOFOO')
+    #grv.prettyPrint(iam_general.get_policies_for_roles())
+
+    grv.prettyPrint(iam_general.id_user(mfa=True))
+    grv.prettyPrint(iam_general.list_users(mfa=True))
+
+#     if args.eksadminrole:
+#         print("check for EKSAdminRole existing here")
+#         sys.exit(1)
+#     else:
+#         #session_ob = boto3.Session()
+#         #client_ob = session_ob.client("sts")
+#         #format_and_output(client_ob.get_caller_identity(), args)
+#
+#         print('--')
+#
+#         #aws_profile = 'ike.levy'
+#         #session = boto3.Session(profile_name=aws_profile)
+#         session = boto3.Session()
+#         client = session.client('iam')
+#
+#         roles = []
+#         response = client.list_roles()
+#         roles.extend(response['Roles'])
+#         while 'Marker' in response.keys():
+#             response = client.list_roles(Marker = response['Marker'])
+#             roles.extend(response['Roles'])
+#
+#         print('roles found: ' + str(len(roles)))
+#         #grv.prettyPrint(roles)
+#         for role in roles:
+#             #print(role['RoleName'])
+#             #print(role['Arn'])
+#             print('##########')
+#             grv.prettyPrint(role)
+#             print('\n\n\n')
+
+
+if __name__ == '__main__':
+    main()

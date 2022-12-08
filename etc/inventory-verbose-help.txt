@@ -1,0 +1,73 @@
+
+This tool, inventory.py, is used to generate an inventory of all AWS
+resources assigned to an arcade. An arcade can be visualized as a 3
+layer cake. The bottom layer is known as the gravitar layer, it is
+essentially an AWS VPC with a number of AWS resources and opinionated
+configuration added on.
+
+The second layer is known as the galaga layer, it contains additonal
+AWS resources and acts as an absract glue layer between the gravatar
+and asteroid layer. The top level is the asteroid layer, which
+provides deployment tools for product services.
+
+The inventory.py tool allows the user get a formatted listing of the
+various layers and a comprehensive inventory. By default, inventory.py,
+outputs to stdout a comprehensive inventory of all layers in a human
+readable json. The following is an example of how get this with an
+example arcade name:
+
+  arcade inventory -A strong_bad.arc
+
+The tool can also write the output to a file by adding the -o
+option. This create the formatted json string and write to a file in
+the directory $HOME/tmp/arcade/file_name.json. The following is an
+example:
+
+  arcade inventory -A strong_bad.arc -o
+  Wrote inventory manifest to /home/bob.dobbs/tmp/arcade/strong_bad.arc-asteroid-inventory.json
+
+The options are:
+  * -a, --asteroid
+      - This option causes the tool to inventory all three layers,
+      gravitar, galaga, and asteroid.
+  
+  * -A NAME, --name NAME
+     - This is the name of the arcade to inventory. (required)
+  
+  * -g, --galaga
+     - This option causes the tool to inventory the gravitar and galaga
+       layer
+  
+  * -G, --gravitar
+     - This option causes the tool to inventory ONLY the gravitar layer
+  
+  * -h, --help
+     - This option causes the printing of the terse help message
+  
+  * -H, --HELP
+     - This option prints the verbose help message, this message
+  
+  * -i, --inclusive
+     - This option causes an inventory of ALL the AWS resources
+  
+  * -j, --json
+      - The output is an unformatted json, not easily read by humans
+  
+  * -J, --JSON
+      - The output is a formatted json, human readable. This option is a
+        default and does not have to be specified.
+  
+  * -n, --arcade
+     - This option causes the tool to inventory all three layers,
+      gravitar, galaga, and asteroid.
+  
+  * -o, --output
+      - Write the output as a json file in the directory $HOME/tmp/arcade
+  
+  * -v, --version
+      - Prints out the version on this tool
+  
+  * -V, --verbose
+      - This option turns on verbose output. This feature is coming in a
+        future release.
+  

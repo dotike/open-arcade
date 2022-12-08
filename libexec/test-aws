@@ -1,0 +1,292 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+test-aws - tests for regular grv operators, as well as library test features
+'''
+
+# @depends: boto3, python (>=3.7)
+__version__ = '0.2'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Various AWS tests, for operators and implementors."
+
+import os
+import sys
+import getopt
+import boto3
+from arclib import grv
+from arclib.grv import die
+import subprocess
+import traceback
+
+
+def grv_doctest_runner(verbose=False):
+    '''
+    Runs doctest tests from grv lib.
+    Exec is necessary here, so the lib can keep its context scoped.
+    '''
+    _grvlib = "{0}/lib/python/arclib/arclib/grv.py".format(myhier)
+
+    if verbose:
+        _cmd = "python3 -m doctest -v {}".format(_grvlib)
+    else:
+        _cmd = "python3 -m doctest {}".format(_grvlib)
+
+    return subprocess.call(_cmd, shell=True)
+
+
+def fetch_lib_test_paths(funk=None):
+    '''
+    Fetches relative test paths, sorted alphabetically.
+
+    Args:
+        None - returns a full list of paths ending with '.py'.
+        funk - string, function name in grv lib
+
+    Returns: list of paths to tests to run.
+    '''
+    _lib_tests = []
+    testdir = "{}/tests".format(myhier)
+
+    for root, dirnames, filenames in os.walk(testdir):
+        for filename in filenames:
+            if funk:
+                if filename.startswith(funk):
+                    _lib_tests.append(os.path.join(root, filename))
+            else:
+                if filename.endswith('.py'):
+                    _lib_tests.append(os.path.join(root, filename))
+    _lib_tests.sort()
+    return _lib_tests
+
+
+def aws_simple_users_check():
+    '''
+    Prints simple output from iam user check.
+    Useful to show weather or not a user has their AWS auth setup correctly.
+    '''
+    # Create IAM client
+    iam = boto3.client('iam')
+
+    # List users with the pagination interface
+    paginator = iam.get_paginator('list_users')
+    for response in paginator.paginate():
+        grv.prettyPrint(response)
+
+
+def print_describe(_fdout=None):
+    try:
+        if _fdout is None:
+            if _exit == 0:
+                _fdout = sys.stdout
+            else:
+                _fdout = sys.stderr
+    except Exception:
+        _fdout = sys.stdout
+    print(_desc.format(_me_cmd=_me_cmd, description=description,), file=_fdout)
+
+
+def usage(msg=None, _exit=1, _fdout=None):
+    '''
+    Usage with exit handling properties.
+
+    Args:
+        msg: string, optional user message to print
+        _exit: int as exit code
+        _fdout: can be sys.stderr or sys.stdout (or other fd)
+
+    Returns:
+        help message text block
+        will exit program
+    '''
+    _desc = """
+{myname}
+
+  {description}
+
+usage:
+
+  {myname}
+  {myname} [-v] [-p|w]
+
+arguments:
+
+  None
+      Print json IAM users to stdout and exit.
+      Useful for operators to test AWS auth configuration, does
+      not rely on external test programs.
+
+  -v  Verbose mode.
+
+  -p  Run all doctest tests for grv python library.
+
+  -w  "workspot" mode, a quick sgrv in this code to run library functions.
+      Also prints the word '# workspot' to stderr.
+
+  -h  Print this help to stdout, and exit zero.
+
+see also:
+  README.md
+  grv help
+"""
+    if _fdout is None:
+        if _exit == 0:
+            _fdout = sys.stdout
+        else:
+            _fdout = sys.stderr
+
+    print(_desc.format(myname=_me_cmd,
+                       version=__version__,
+                       description=description), file=_fdout)
+    _fdout.flush()
+    if msg is not None and msg != '':
+        print('\n' + str(msg), file=_fdout)
+        _fdout.flush()
+    sys.exit(_exit)
+
+
+def main(argv):
+    '''
+    Process program args and handle all program interfaces.
+
+    Args:
+        argv: All command line options and arguments.
+
+    Returns:
+        In many cases the program is designed to exit from other program
+        logic before reaching the end of this function.
+        If we reach the end of this function, intentionally exit using
+        the exit code, which may have been set by called program logic.
+
+    Bugs:
+        Python option handling silently drops ordering of option batching.
+    '''
+    global verbose
+    try:
+        for arg_pre in sys.argv:
+            if str(arg_pre) == '-pv':
+                verbose = True
+            elif str(arg_pre) == '-v':
+                verbose = True
+    except Exception as err:
+        die('invalid arg: {0}'.format(err))
+
+    try:
+        opts, args = getopt.getopt(argv, 'vhpdhw', ["help"])
+    except getopt.GetoptError as err:
+        die("Error: '{}', try -h for usage.".format(err), 2)
+    try:
+        for flag, opt in opts:
+            if flag == '-v':
+                verbose = True
+            elif flag == '-h':
+                usage('', 0)
+            elif flag == '-p':
+                try:
+                    sys.exit(grv_doctest_runner(verbose))
+                except Exception as err:
+                    die(err)
+                sys.exit(_exit)
+            elif flag == '-d':
+                try:
+                    print_describe(sys.stdout)
+                except Exception as err:
+                    die(err)
+                sys.exit(_exit)
+            elif flag == '-h' or flag == '--help':
+                usage('', 0)
+                sys.exit(0)
+            elif flag == '-w':
+                print('# workspot', file=sys.stderr)
+                try:
+
+                    # Example,
+                    # grv.pVpcIdrettyPrint(grv.list_igw())
+                    ami_default_search_description = "Canonical, Ubuntu, 16.04 LTS, amd64 xenial image build on 2019-06-28"
+                    biglist = grv.list_default_amis(region='us-east-2')
+                    # for ami, meta in biglist.iteritems():
+                    #   print ami, meta['region'], meta['RootDeviceType']
+                    #   if ami == 'ami-09c094f89ad43f4e0':
+                    #       grv.prettyPrint(meta)
+                    #    if ami == 'ami-0f93b5fd8f220e428':
+                    #       grv.prettyPrint(meta)
+                    grv.prettyPrint(biglist)
+
+                    # grv.prettyPrint(grv.list_iam_roles())
+                    # print " ##############################################################################"
+                    # grv.prettyPrint(grv.list_iam_roles(grv_id='light_catimor.grv'))
+                    # print " ##############################################################################"
+                    # grv.prettyPrint(grv.list_iam_roles(grv_id='light_catimor.grv', show_policy=True))
+                    # print " ##############################################################################"
+                    # grv.prettyPrint(grv.list_sqs_queues(grv_id='light_peaberry.grv'))
+                    # print " ##############################################################################"
+                    # grv.prettyPrint(grv.list_sqs_queues(sqs_id='light_peaberry-grv-dns_updates_failed', region='us-west-1'))
+                    # print " ##############################################################################"
+                    # grv.prettyPrint(grv.list_sqs_queues(sqs_id='light_peaberry-grv-dns_updates', region='us-west-1'))
+                    # print " ##############################################################################"
+                    # grv.prettyPrint(grv.list_sqs_queues(sqs_id='dns_updates_failed-lig'))
+                    # print " ##############################################################################"
+                    # grv.prettyPrint(grv.list_sqs_queues(region='us-west-1'))
+
+                    # grv.prettyPrint(grv.list_lambdas(region='us-west-1'))
+                    # grv.prettyPrint(grv.list_lambdas())
+                    # grv.prettyPrint(grv.list_lambdas(grv_id='no_grv.test', region='us-west-1'))
+
+                except Exception as err:
+                    traceback.print_exc()
+                    raise type(err)(
+                        'workspot failure: {}'.format(err))
+                sys.exit(0)
+    except (RuntimeError, TypeError, NameError) as err:
+        die('invalid arg: {0}'.format(err))
+
+    if len(args) == 0:
+        try:
+            print(grv.aws_whoami())
+            try:
+                if verbose:
+
+                    account_id_data = grv.fetch_account_id()
+                    print(f'console: https://{account_id_data[0]}.signin.aws.amazon.com/console')
+
+                    if account_id_data[1]:
+                        print(f'alias: https://{account_id_data[1][0]}.signin.aws.amazon.com/console')
+
+                    if not account_id_data[1]:
+                        print('alias: None')
+
+            except Exception:
+                pass
+        except Exception as err:
+            quickmsg = "-h for help, Did you configure AWS access by reading the 'README.md'?"
+            die('{0} : {1}'.format(quickmsg, err))
+        sys.exit(0)
+
+    # if we've reached this point, explicitly exit not OK
+    die("Bad procedure for program.", 76)
+
+
+description = """Various AWS tests, for operators and implementors."""
+if os.environ['MYHIER']:
+    myhier = os.environ['MYHIER']
+else:
+    dothere = os.path.dirname(os.path.normpath(sys.argv[0]))
+    myhier = os.path.dirname(dothere)
+grv_conf = grv.source(str(myhier + '/etc/grv.conf'))
+_me = os.path.basename(sys.argv[0])
+_me_cmd = _me.split('-', 1)[1]
+_desc = """
+  {_me_cmd} - {description}
+"""
+global verbose
+verbose = False
+try:
+    if _exit is None:
+        _exit = 0
+except Exception:
+    _exit = 0
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

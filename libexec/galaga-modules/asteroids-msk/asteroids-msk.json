@@ -1,0 +1,19 @@
+{
+  "name": "asteroids-msk",
+  "component_type": "asteroids-msk",
+  "version": 1,
+  "description": "Data for the ASTEROIDS MSK GALAGA",
+  "services": {
+    "msk": {
+      "service_options": {
+        "cluster_prefix": "asteroids",
+        "instance_type": "kafka.m5.large",
+        "kafka_version": "2.6.2",
+        "ebs_size": 100,
+        "brokers_per_az": 1,
+        "cfg_auto_create_topics_enable": "true",
+        "cfg_delete_topic_enable": "true"
+      }
+    }
+  }
+}

@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+asteroids-msk-destroy -- GALAGA destroy the asteroids MSK
+'''
+
+# @depends: python (>=3.9)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Destroy the ASTEROIDS msk infrastructure."
+
+import argparse
+import logging
+import os
+from pprint import pprint
+import sys
+
+import boto3
+
+from arclib import common
+from arclib import log
+from arclib import storage
+
+from asteroids_msk import delete_msk
+from asteroids_msk import delete_msk_configuration
+from asteroids_msk import delete_msk_route53_records
+
+def destroy_asteroids_msk(arcade_name: str,
+                          gsd_data: dict) -> bool:
+    """
+    Destroy the ASTEROIDS MSK cluster.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    msk_data = gsd_data['services']['msk']['service_options']
+    cluster_prefix = msk_data['cluster_prefix']
+
+    logging.info(f"{cluster_prefix}-{arcade_name}")
+    status = delete_msk(arcade_name,
+                         cluster_prefix)
+    if 'Error' in status:
+        return False
+
+    if not status:
+        r_dict = delete_msk_route53_records(arcade_name)
+
+    return True
+
+
+def destroy_asteroids_msk_configuration(arcade_name: str,
+                                        gsd_data: dict) -> bool:
+    """
+    Destroy the ASTEROIDS MSK configuration.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    msk_data = gsd_data['services']['msk']['service_options']
+    cluster_prefix = msk_data['cluster_prefix']
+
+    status_config = delete_msk_configuration(arcade_name,
+                                             cluster_prefix)
+    if 'Error' in status_config:
+        return False
+
+    return True
+
+
+def main():
+    """
+    %(prog)s - Destroy the GALAGA asteroids MSK
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path to filename in s3", required=True)
+
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(1)
+    arcade_name = args.arcade
+    os.environ["AWS_DEFAULT_REGION"] = common.get_arcade_region(arcade_name)
+
+    tmp_dir = os.getenv("ATMP", '/tmp')
+
+    session = boto3.session.Session()
+
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    if not gsd_data:
+        sys.exit(1)
+    pprint(gsd_data)
+
+    if not destroy_asteroids_msk(arcade_name, gsd_data):
+        logging.info("Create ASTEROIDS MSK cluster failed.")
+        sys.exit(1)
+
+    if not destroy_asteroids_msk_configuration(arcade_name, gsd_data):
+        logging.info("Create AStEROIDS MSK configuration failed.")
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

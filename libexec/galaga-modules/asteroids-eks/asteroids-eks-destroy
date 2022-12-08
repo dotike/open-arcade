@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+
+import argparse
+import logging
+import os
+from pprint import pprint
+import sys
+
+import boto3
+
+from arclib import alb, common
+from arclib import log
+from arclib import storage
+
+from asteroids_eks import delete_arcade_alb, delete_eks, delete_eks_nodegroup
+from asteroids_eks import delete_asteroids_fluentd_daemonset
+
+
+def destroy_asteroids_albs(arcade_name: str, gsd_data: dict) -> bool:
+    """
+    Destroy the ASTEROIDS ALBs.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+
+    for lb_type in [True, False]:
+        alb_dict = alb.get_alb_dict(arcade_name, lb_type)
+        if alb.get_alb_status(alb_dict['name']):
+            logging.info(f"Destroying {alb_dict['name']} ALB on {arcade_name}")
+            if not delete_arcade_alb(arcade_name, lb_type):
+                return False
+
+    return True
+
+
+def destroy_asteroids_eks(arcade_name: str, gsd_data: dict) -> bool:
+    """
+    Destroy the ASTEROIDS EKS cluster.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    eks_data = gsd_data['services']['eks']['service_options']
+    cluster_prefix = eks_data['cluster_prefix']
+
+    if not arcade_name or not cluster_prefix:
+        print("Invalid arcade name or cluster prefix")
+        return False
+
+    logging.info(f"{cluster_prefix}-{arcade_name}")
+    status = delete_eks(arcade_name, cluster_prefix)
+    if not status.get('Error')['Code'] == 'ResourceNotFoundException':
+        logging.error(status)
+        return False
+
+    return True
+
+
+def destroy_asteroids_eks_nodegroups(arcade_name: str, gsd_data: dict) -> bool:
+    """
+    Destroy the ASTEROIDS EKS nodegroups.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    eks_data = gsd_data['services']['eks']['service_options']
+    cluster_prefix = eks_data['cluster_prefix']
+    cluster_name = f"{cluster_prefix}-{arcade_name.replace('.', '-')}"
+    nodegroup_data = gsd_data['services']['nodegroup']['service_options']
+    logging.info(cluster_name)
+
+    for nodegroup_prefix in nodegroup_data.keys():
+        nodegroup_options = nodegroup_data[nodegroup_prefix]
+        nodegroup_options['nodegroup_prefix'] = nodegroup_prefix
+        status = delete_eks_nodegroup(arcade_name, cluster_prefix, nodegroup_options)
+        if not status.get('Error')['Code'] == 'ResourceNotFoundException':
+            logging.info(status)
+            return False
+
+    return True
+
+
+def destroy_asteroids_node_collector(arcade_name: str,
+                                     gsd_data: dict) -> bool:
+    """
+    Destroy the Asteroid EKS node daemonset collector.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    cluster_prefix = 'log-relay'
+
+    delete_asteroids_fluentd_daemonset(arcade_name, cluster_prefix)
+
+    return True
+
+
+def main():
+    """
+    %(prog)s - Destroy the GALAGA asteroids
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path to filename in s3", required=True)
+
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(1)
+    arcade_name = args.arcade
+    os.environ["AWS_DEFAULT_REGION"] = common.get_arcade_region(arcade_name)
+
+    tmp_dir = os.getenv("ATMP", '/tmp')
+
+    session = boto3.session.Session()
+
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    if not gsd_data:
+        sys.exit(1)
+    pprint(gsd_data)
+
+    if not destroy_asteroids_eks_nodegroups(arcade_name, gsd_data):
+        logging.info("Destroy ASTEROIDS EKS nodegroups failed.")
+        sys.exit(1)
+
+    if not destroy_asteroids_eks(arcade_name, gsd_data):
+        logging.info("Destroy ASTEROIDS EKS cluster failed.")
+        sys.exit(1)
+
+    if not destroy_asteroids_albs(arcade_name, gsd_data):
+        logging.info("Destroy ASTEROIDS ALBs failed.")
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

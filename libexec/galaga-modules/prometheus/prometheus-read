@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+prometheus-read -- GALAGA read status of ARCADE/Account Infrastructure components.
+'''
+
+# @depends: boto3, python (>=3.9)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Print status of ARCADE/Account components status."
+
+import argparse
+import logging
+import sys
+import os
+from arclib import log
+from arclib import storage
+import boto3
+from pprint import pprint
+
+from prometheus_grafana import find_prometheus_workspaces
+from prometheus_grafana import find_grafana_workspaces
+from prometheus_grafana import namespace_present
+from prometheus_grafana import get_prometheus_grafana_role
+
+
+def main():
+    """Gets information on Prometheus/Grafana for a given Arcade
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("-p", "--path", help="Full path to filename in s3", required=True)
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+    
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(1)
+
+    arcade_name = args.arcade
+    
+    session = boto3.session.Session()
+    
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+        
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    
+    failed = False
+    
+    # Check Prometheus Role
+    if not get_prometheus_grafana_role(arcade_name=arcade_name, application='prometheus'):
+        logging.info('Prometheus Role is missing')
+        failed = True
+    
+    # Check Grafana Role
+    if not get_prometheus_grafana_role(arcade_name=arcade_name, application='grafana'):
+        logging.info('Grafana Role is missing')
+        failed = True
+    
+    # Check for Prometheus Namespace
+    if not namespace_present(arcade_name=arcade_name, namespace='prometheus'):
+        logging.info('Prometheus on EKS is not present')
+        failed = True
+    
+    # Check for Prometheus Workspace
+    if not find_prometheus_workspaces(arcade_name=arcade_name):
+        logging.info('Could not find Prometheus')
+        failed = True
+    
+    # Check for Grafana Workspace    
+    if not find_grafana_workspaces(arcade_name=arcade_name):
+        logging.info('Could not find Grafana')
+        failed = True
+
+    if failed:
+        sys.exit(1)
+    
+
+    sys.exit(0)
+    
+    
+if __name__ == '__main__':
+    main()
+

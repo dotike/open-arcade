@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+# @depends: boto3, python (>=3.7)
+__version__ = '0.0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Lists EKS Clusters, account-wide "
+__usage__ = """
+This program outputs large complete data sets with no input, and each command line option act a some form of filter.
+
+This program walks all available regions, some options greatly improve speed by reducing scope of return.
+IP address options support only IPv4, current AWS implementations for EKS do not support IPv6.
+
+Filters using '-C' or '-E' optargs perform IP address matching from the start of the explicit string supplied, metacharacters are not processed.  (Equivalent to searching for '^string*'.)  This allows simple IP address filtering, so a search for 0.0.0.0 does not return addresses like 10.0.0.0/28 by mistake.
+Using both '-C' and '-E' optargs acts like double reductive filters, returning EKS clusters which possess search matches for values supplied to both optargs.
+"""
+
+import argparse
+import boto3
+import sys
+import os
+import json
+import ipaddress
+
+from arclib import grv as grv
+from arclib import eks as eks
+from arclib import storage, log, common
+
+
+def build_cli_out(in_dict):
+    """
+    Builds multi-line text block for CLI default output.
+    """
+
+    text_return="""
+               """
+    for uid in in_dict.keys():
+        try:
+            arcade_name = str(in_dict[uid]['TagSane']['grv_name'])
+        except:
+            arcade_name = '-'
+        try:
+            eks_creator = str(in_dict[uid]['TagSane']['creator'])
+        except:
+            eks_creator = '-'
+        text_return = text_return + str('{} {} {} {} {} {} {} {}\n').format(
+              uid,
+              in_dict[uid]['platformVersion'],
+              in_dict[uid]['version'],
+              in_dict[uid]['region'],
+              in_dict[uid]['resourcesVpcConfig']['vpcId'],
+              in_dict[uid]['status'],
+              eks_creator,
+              arcade_name
+        )
+    return text_return
+
+
+def format_and_output(in_dict: dict, args):
+    if args.jsonpretty:
+        print(json.dumps(in_dict, indent=4, sort_keys=True, default=str))
+    elif args.json:
+        print(json.dumps(in_dict, sort_keys=True, default=str))
+    elif args.dictpretty:
+        grv.prettyPrint(in_dict)
+    else:
+        if in_dict:
+            print(common.columnate(build_cli_out(in_dict)))
+    sys.exit(0)
+
+
+def return_ingress_networks(eks_dict, ipswitch):
+    """
+    Given a seurity group rule dict, returns a list of all IPv4 and IPv6 addresses.
+
+    Input:
+        eks_dict - EKS object dict
+        ipswitch - string "control" or "endpoint"
+
+    Output:
+        A list of strings containing IPv4/IPv6 networks, containing
+        redundant copies of the networks to provide all posible string names.
+
+        For IPv4 networks, two representations are returned:
+          - literal (may be mixed expansion, or not have subnet CIDR)
+          - expanded notation (always includes CIDR)
+
+    Bugs:
+        This tool does not not currently support IPv6 networking, because
+        AWS EKS does not currently support IPv6 networking.
+    """
+    ip_list_return = []
+
+    if ipswitch == 'control':
+        vpc_info = eks_dict.get('resourcesVpcConfig', {})
+        for v4_raw in vpc_info.get('publicAccessCidrs', []):
+            if v4_raw:
+                v4_expanded = str(ipaddress.ip_network(v4_raw, ''))
+            else:
+                v4_expanded = ''
+            ip_list_return.append(v4_raw)
+            ip_list_return.append(v4_expanded)
+
+    elif ipswitch == 'endpoint':
+        target_l1 = 'kubernetesNetworkConfig'
+        target_l2 = 'serviceIpv4Cidr'
+        vpc_info = eks_dict.get('kubernetesNetworkConfig', {})
+        v4_raw = vpc_info.get('serviceIpv4Cidr', '')
+        if v4_raw:
+            v4_expanded = str(ipaddress.ip_network(v4_raw, ''))
+        else:
+            v4_expanded = ''
+        ip_list_return.append(v4_raw)
+        ip_list_return.append(v4_expanded)
+
+    else:
+        raise AttributeError(
+            'return_ingress_networks() requires string string "control" or "endpoint"')
+
+    return ip_list_return
+
+
+def main():
+    """
+    Process args and take action.
+    """
+    parser = argparse.ArgumentParser(
+        description=__description__,
+        epilog=__usage__,
+        prog='arcade audit eks',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("-A", "--arcade", help='Optional Arcade Name, reduce scope to one Arcade.')
+    parser.add_argument("-r", "--region", help='Optional region scope, default is all regions available.')
+    parser.add_argument("-C", "--control-ip", help='Filter for cluster Control point ip CIDR, string literal. ')
+    parser.add_argument("-E", "--endpoint-ip", help='Filter for API server Endpoint access ip CIDR, string literal. ')
+    parser.add_argument("-j", "--json", action='store_true', help='JSON output.')
+    parser.add_argument("-J", "--jsonpretty", action='store_true', help='PrettyPrint JSON output.')
+    parser.add_argument("-D", "--dictpretty", action='store_true',
+                        help='PrettyPrint Python Dict, legible convienence for developement.')
+    parser.add_argument("-v", "--verbose", action='store_true', help='Verbose output to stderr.')
+    args = parser.parse_args()
+
+    # Validate that aws credentials are valid
+    common.validate_aws_creds()
+
+    eks_list_return = {}
+    if args.verbose:
+      os.environ['VERBOSE'] = 'True'
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME', "")
+
+    if args.arcade:
+        eks_list = eks.get_eks_clusters_detail(arcade_name=args.arcade)
+    else:
+        eks_list = eks.get_eks_clusters_detail(region=args.region)
+
+    eks_list_filtered = {}
+    if args.control_ip:
+        for eksid in eks_list.keys():
+            sfound = -1
+            # get and compare IP 'publicAccessCidrs'
+            for addr in return_ingress_networks(eks_list.get(eksid), 'control'):
+                sfound = addr.find(str(args.control_ip))
+            if sfound == 0:
+                eks_list_filtered[eksid] = eks_list.get(eksid)
+    if args.endpoint_ip:
+        for eksid in eks_list.keys():
+            sfound = -1
+            # get and compare IP 'serviceIpv4Cidr'
+            for addr in return_ingress_networks(eks_list.get(eksid), 'endpoint'):
+                sfound = addr.find(str(args.endpoint_ip))
+            if sfound == 0:
+                eks_list_filtered[eksid] = eks_list.get(eksid)
+
+    if args.control_ip or args.endpoint_ip:
+        eks_list_return = eks_list_filtered
+    else:
+        eks_list_return = eks_list
+
+    format_and_output(eks_list_return, args)
+
+
+if __name__ == '__main__':
+    main()

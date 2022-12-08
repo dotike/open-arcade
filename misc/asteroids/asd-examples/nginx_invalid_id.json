@@ -1,0 +1,31 @@
+{
+   "service": "nginx-aarf",
+   "description": "invalid service name",
+   "version": 3,
+   "component_type": "k8s",
+   "containers": [
+      {
+         "name": "aarf",
+         "image": "nginx:latest",
+         "readiness_check_path": "/",
+         "cpu": 1,
+         "cpu_limit": 2,
+         "mem": 1024,
+         "mem_limit": 2048,
+         "port_mappings": [
+            {
+              "port": 80,
+              "port_name": "http"
+            }
+         ]
+      }
+   ],
+   "service_options": {
+      "alerting": true,
+      "desired_count": 1,
+      "load_balanced": {
+          "public": true,
+          "private": true
+      }
+   }
+}

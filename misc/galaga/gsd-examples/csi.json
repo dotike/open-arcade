@@ -1,0 +1,8 @@
+{
+    "name": "csi",
+    "component_type": "csi",
+    "version": 1,
+    "description": "Module to mount parameters or secrets in pods",
+    "dependencies": ["eks", "alb", "secretsmanager"],
+    "service_options": {}
+}

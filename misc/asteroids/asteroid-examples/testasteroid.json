@@ -1,0 +1,27 @@
+{
+    "user": "first.last",
+    "createTime": "2021/03/17/20/58",
+    "name": "testasteroid",
+    "version": 1,
+    "metadata": {},
+    "tags": {},
+    "services": {
+        "nginxaarf": {
+            "location": "asd/nginxaarf/latest/latest.json",
+            "overrides": {
+                "service_options/load_balanced/private": "true"
+            },
+            "config_overrides": {}
+        },
+        "nginxwoof": {
+            "location": "asd/nginxwoof/latest/latest.json",
+            "overrides": {
+                "service_options/desired_count": 2
+            },
+            "config_overrides": {}
+        }
+    },
+    "namespace": "testAsteroid",
+    "environment": "dev",
+    "desired_state": ""
+}

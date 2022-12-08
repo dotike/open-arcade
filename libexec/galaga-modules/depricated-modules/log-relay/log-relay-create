@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+log-relay -- Create ARCADE scoped log relay.
+'''
+
+# @depends: python (>=3.9)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Create ARCADE scoped log relay."
+
+import argparse
+import logging
+import os
+from pprint import pprint
+import sys
+
+import boto3
+
+from jinja2 import Template
+from arclib import alb
+from arclib import ami
+from arclib import asg
+from arclib import common
+from arclib import dns
+from arclib import log
+from arclib import storage
+
+from log_relay import create_asg
+from log_relay import create_asg_template
+from log_relay import create_galaga_nlb
+from log_relay import create_galaga_nlb_listener
+from log_relay import set_relay_log_group_retention
+from log_relay import create_relay_log_group
+
+
+def create_logrelay_asg(arcade_name: str,
+                        gsd_data: dict) -> bool:
+    """
+    Create the ARCADE log relay.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    session = boto3.session.Session()
+    # bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+    bucket = storage.get_account_global_bucket(session)
+    arcade_domain = arcade_name.replace('_', '-')
+    asg_data = gsd_data['services']['asg']['service_options']
+    cluster_prefix = asg_data['cluster_prefix']
+    asg_name = f"{cluster_prefix}.{arcade_domain}"
+    image_id = ami.get_ami_id(session, asg_data['node_ami_name'])
+    user_data_filename = f"userdata/{gsd_data['name']}/{asg_data['user_data_file']}"
+    user_data_render_data = gsd_data['services']['asg']['service_options']
+    user_data_render_data['asg_name'] = asg_name
+    user_data_template = storage.s3_object_to_str(session, bucket, user_data_filename)
+    user_data = Template(user_data_template).render(user_data_render_data)
+    pprint(user_data_render_data)
+    print("------------")
+    print(user_data_filename)
+    print("____________")
+    print(user_data)
+
+    delete_on_term = asg_data['vol_delete_on_termination']
+    encrypted = asg_data['ebs_vol_encrypted']
+    block_device_mappings = []
+    if asg_data.get('ebs_root_vol_name'):
+        block_device_mappings.append({
+            'DeviceName': asg_data['ebs_root_vol_name'],
+            'Ebs': {
+                'VolumeSize': int(asg_data['ebs_root_vol_size']),
+                'VolumeType': asg_data['ebs_root_vol_type'],
+                'DeleteOnTermination': delete_on_term,
+                'Encrypted': encrypted
+            }
+        })
+    if asg_data.get('ebs_data_vol_name'):
+        block_device_mappings.append({
+            'DeviceName': asg_data['ebs_data_vol_name'],
+            'Ebs': {
+                'VolumeSize': int(asg_data['ebs_data_vol_size']),
+                'VolumeType': asg_data['ebs_data_vol_type'],
+                'DeleteOnTermination': delete_on_term,
+                'Encrypted': encrypted
+            }
+        })
+
+    if not asg.asg_health(asg_name):
+        status_template = create_asg_template(arcade_name,
+                                              cluster_prefix,
+                                              image_id,
+                                              user_data,
+                                              asg_data['instance_type'],
+                                              block_device_mappings)
+        if status_template:
+            status = create_asg(arcade_name,
+                                cluster_prefix,
+                                int(asg_data['asg_capacity']),
+                                int(asg_data['asg_max_capacity'])
+                               )
+            if status != "HEALTHY":
+                logging.error(status)
+                return False
+        else:
+            logging.error(status_template)
+            return False
+
+    return True
+
+
+def create_logrelay_nlb(arcade_name: str,
+                        gsd_data: dict) -> bool:
+    """
+    Create the ARCADE log relay.
+
+    Args:
+        arcade_name (str): The name of the ARCADE
+        gsd_data (dict): The dict of GSD data
+
+    Returns:
+        bool: Success or failure
+    """
+    arcade_domain = arcade_name.replace('_', '-')
+    asg_data = gsd_data['services']['asg']['service_options']
+    cluster_prefix = asg_data['cluster_prefix']
+    arcade_safe_name = arcade_name.replace('_', '').replace('.', '-')
+    asg_name = f"{cluster_prefix}.{arcade_domain}"
+    pprint(asg_data)
+    print("------------")
+
+    lb_public = False
+    lb_type = 'private'
+    lb_port = 514
+    lb_path = ""
+    lb_protocol = "tcp_udp"
+
+    asg_lb_name = f"{cluster_prefix}-{lb_type}nlb-{arcade_safe_name}"
+    if not alb.get_alb_status(asg_lb_name):
+        nlb_response = create_galaga_nlb(arcade_name, cluster_prefix, lb_public)
+        # print(nlb_response)
+        logging.debug(nlb_response)
+
+        target_group_arn = alb.create_arcade_target_group(arcade_name,
+                                                          lb_type,
+                                                          cluster_prefix,
+                                                          lb_protocol,
+                                                          lb_port,
+                                                          lb_path)
+        logging.debug(target_group_arn)
+        asg_lb_status = alb.attach_asg_to_tg(asg_name, target_group_arn)
+        logging.debug(asg_lb_status)
+        lstn_response = create_galaga_nlb_listener(arcade_name,
+                                                   lb_type,
+                                                   cluster_prefix,
+                                                   target_group_arn)
+        logging.debug(lstn_response)
+        dns_source = f"{cluster_prefix}.{arcade_name.replace('_', '-')}"
+        dns_target = nlb_response['DNSName']
+        dns.add_arcade_cname(arcade_name, dns_source, dns_target)
+
+    return True
+
+
+def main():
+    """
+    %(prog)s - Create the ARCADE log relay ASG.
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("-A", "--arcade", help='Arcade Name')
+    parser.add_argument("--gsd", action="store_true", help="Use Account bucket not ARCADE bucket")
+    parser.add_argument("-p", "--path", help="Full path to filename in s3", required=True)
+
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not args.arcade:
+        args.arcade = os.getenv('ARCADE_NAME')
+        if not args.arcade:
+            print("Arcade name missing, use -A/--arcade")
+            parser.print_help()
+            sys.exit(1)
+    arcade_name = args.arcade
+    os.environ["AWS_DEFAULT_REGION"] = common.get_arcade_region(arcade_name)
+
+    session = boto3.session.Session()
+
+    if args.gsd:
+        bucket = storage.get_account_global_bucket(session)
+    else:
+        bucket = storage.get_arcade_buckets(session, arcade_name)['infrastructure']
+
+    gsd_data = storage.load_arcade_json_to_dict(bucket, args.path)
+    if not gsd_data:
+        sys.exit(1)
+    pprint(gsd_data)
+
+    if not create_relay_log_group(arcade_name=arcade_name):
+        logging.info("Creation of loggroup failed!")
+        sys.exit(1)
+    
+    if not set_relay_log_group_retention(arcade_name=arcade_name, retention_in_days=7):
+        logging.info("Retention In Days Failed!")
+        sys.exit(1)
+    
+    if not create_logrelay_asg(arcade_name, gsd_data):
+        logging.info("Creation of the log relay ASG cluster failed.")
+        sys.exit(1)
+
+    if not create_logrelay_nlb(arcade_name, gsd_data):
+        logging.info("Creation of the log relay NLB failed.")
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

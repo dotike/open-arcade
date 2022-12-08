@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+asteroids-read -- GALAGA read status and informaation for an asteroids
+'''
+
+# @depends: python (>=3.9)
+__version__ = '0.1.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Check each component of an ASTEROIDS infrastructure."
+
+
+import argparse
+import logging
+from pprint import pprint
+import sys
+
+from arclib import common
+from arclib import grv
+from arclib import log
+
+from asteroids_eks import create_policy
+from asteroids_eks import create_role
+
+
+def initialize_asteroids_eks() -> bool:
+    """
+    Initialize the ASTEROIDS ALBs.
+
+    Args:
+
+    Returns:
+        bool: Success or failure
+    """
+    owner_id = common.get_account_id()
+    eks_admin_policy = 'EKSAdminPolicy'
+    eks_admin_role = 'EKSAdminRole'
+    eks_assume_admin_policy = 'EKSAssumeAdminRole'
+    EKS_ADMIN_POLICY_DOCUMENT = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "eks:*",
+                    "ssm:GetParameter"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": "iam:PassRole",
+                "Resource": "*",
+                "Condition": {
+                    "StringEquals": {
+                        "iam:PassedToService": "eks.amazonaws.com"
+                    }
+                }
+            }
+        ]
+    }
+    EKS_ASSUME_ADMIN_POLICY_DOCUMENT = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "sts:AssumeRole"
+                ],
+                "Resource": [
+                    f"arn:aws:iam::{owner_id}:role/{eks_admin_role}"
+                ]
+            }
+        ]
+    }
+    ASSUME_ADMIN_ROLE_POLICY_DOCUMENT = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "AWS": f"arn:aws:iam::{owner_id}:root"
+                },
+                "Action": "sts:AssumeRole",
+                "Condition": {}
+            }
+        ]
+    }
+
+    if not grv.get_policy_arn(eks_assume_admin_policy):
+        logging.info(f"{eks_assume_admin_policy} doesn't exist")
+        if not create_policy(eks_assume_admin_policy, EKS_ASSUME_ADMIN_POLICY_DOCUMENT):
+            logging.error(f"Didn't create {eks_assume_admin_policy}")
+            return False
+
+    policy_arn = grv.get_policy_arn(eks_admin_policy)
+    if not policy_arn:
+        logging.info(f"{eks_admin_policy} doesn't exist")
+        policy_arn = create_policy(eks_admin_policy, EKS_ADMIN_POLICY_DOCUMENT)
+        if not policy_arn:
+            logging.error(f"Didn't create {eks_admin_policy}")
+            return False
+
+    eks_admin_policy_arns = [policy_arn]
+    if not grv.find_role(eks_admin_role):
+        logging.info(f"{eks_admin_role} doesn't exist")
+        if not create_role(eks_admin_role, eks_admin_policy_arns, ASSUME_ADMIN_ROLE_POLICY_DOCUMENT):
+            logging.error(f"Didn't create {eks_admin_role}")
+            return False
+
+    return True
+
+
+def main():
+    """
+    %(prog)s - Display asteroids GALAGA information
+    """
+    parser = argparse.ArgumentParser(description=main.__doc__)
+
+    log.add_log_level_argument(parser)
+    args = parser.parse_args()
+    log.set_log_level(args.verbose)
+
+    if not initialize_asteroids_eks():
+        logging.error("EKS account role not initalized.")
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

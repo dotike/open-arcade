@@ -1,0 +1,98 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "definitions": {
+        "service": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string"
+                },
+                "overrides": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "location",
+                "overrides"
+            ]
+        }
+    },
+    "type": "object",
+    "title": "Asteroid schema",
+    "description": "The schema comprises an asteroid.",
+    "default": {},
+    "required": [
+        "user",
+        "createTime",
+        "name",
+        "version",
+        "metadata",
+        "services",
+        "namespace",
+        "environment",
+        "desired_state"
+    ],
+    "properties": {
+        "user": {
+            "$id": "#/properties/user",
+            "type": "string",
+            "title": "User",
+            "description": "The user who creates the schema."
+        },
+        "createTime": {
+            "$id": "#/properties/createTime",
+            "type": "string",
+            "title": "CreateTime",
+            "description": "The time (%Y/%m/%d/%H/%M) the asteroid json is created."
+        },
+        "name": {
+            "$id": "#/properties/name",
+            "type": "string",
+            "pattern": "^[a-z][-a-z0-9]{3,23}$",
+            "title": "Name",
+            "description": "The name of asteroid."
+        },
+        "version": {
+            "$id": "#/properties/version",
+            "type": "integer",
+            "title": "Version",
+            "description": "The version of asteroid."
+        },
+        "metadata": {
+            "$id": "#/properties/metadata",
+            "type": "object",
+            "title": "Metadata",
+            "description": "The metadata of the asteroid with {key, value} pairs.",
+            "default": {}
+        },
+        "services": {
+            "$id": "#/properties/services",
+            "type": "object",
+            "title": "Services",
+            "description": "A list of asd services.",
+            "additionalProperties": {
+                "$ref": "#/definitions/service"
+            },
+            "default": {}
+        },
+        "namespace": {
+            "$id": "#/properties/namespace",
+            "type": "string",
+            "title": "Namespace",
+            "description": "The namespace of asteroid."
+        },
+        "environment": {
+            "$id": "#/properties/environment",
+            "type": "string",
+            "title": "Environment",
+            "description": "The environment of asteroid."
+        },
+        "desired_state": {
+            "$id": "#/properties/desired_state",
+            "type": "string",
+            "title": "Desired_state",
+            "description": "The desired_state of asteroid."
+        }
+    }
+}

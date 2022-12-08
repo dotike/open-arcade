@@ -1,0 +1,20 @@
+{
+    "user": "andy.dunlap",
+    "createTime": "2022/04/26/20/02",
+    "name": "arcadebase",
+    "version": 2,
+    "components": {
+        "asteroids-eks": {
+            "location": "gsd/asteroids-eks/default.json",
+            "overrides": {}
+        },
+        "asteroids-msk": {
+            "location": "gsd/asteroids-msk/default.json",
+            "overrides": {}
+        },
+        "secretsmanager": {
+            "location": "gsd/secretsmanager/default.json",
+            "overrides": {}
+        }
+    }
+}

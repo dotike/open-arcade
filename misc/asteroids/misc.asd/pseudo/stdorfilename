@@ -1,0 +1,11 @@
+import sys
+# parse command line
+if file_name_given:
+    inf = open(file_name_given)
+else:
+    inf = sys.stdin
+
+
+
+if inf is not sys.stdin:
+    inf.close()

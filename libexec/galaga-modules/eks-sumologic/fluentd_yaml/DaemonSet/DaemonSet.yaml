@@ -1,0 +1,187 @@
+# Source: sumologic/charts/fluent-bit/templates/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: arcade-fluentd-fluent-bit
+  labels:
+    helm.sh/chart: fluent-bit-0.20.2
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/instance: arcade-fluentd
+    app.kubernetes.io/version: "1.9.4"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fluent-bit
+      app.kubernetes.io/instance: arcade-fluentd
+  template:
+    metadata:
+      annotations:
+        checksum/config: 7b0f91d262bdd657681b3942c0e274b1179bfd13c4cde931f4595ca4499b34ce
+        checksum/luascripts: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      labels:
+        app.kubernetes.io/name: fluent-bit
+        app.kubernetes.io/instance: arcade-fluentd
+    spec:
+      serviceAccountName: arcade-fluentd-fluent-bit
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
+      containers:
+        - name: fluent-bit
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+          image: "public.ecr.aws/sumologic/fluent-bit:1.6.10-sumo-2"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FLUENTD_LOGS_SVC
+              valueFrom:
+                configMapKeyRef:
+                  key: fluentdLogs
+                  name: sumologic-configmap
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - name: http
+              containerPort: 2020
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+          volumeMounts:
+            - mountPath: /fluent-bit/etc/fluent-bit.conf
+              name: config
+              subPath: fluent-bit.conf
+            - mountPath: /fluent-bit/etc/custom_parsers.conf
+              name: config
+              subPath: custom_parsers.conf
+            - mountPath: /var/log
+              name: varlog
+            - mountPath: /var/lib/docker/containers
+              name: varlibdockercontainers
+              readOnly: true
+            - mountPath: /etc/machine-id
+              name: etcmachineid
+              readOnly: true
+            - mountPath: /tail-db
+              name: tail-db
+      volumes:
+        - name: config
+          configMap:
+            name: arcade-fluentd-fluent-bit
+        - hostPath:
+            path: /var/log
+          name: varlog
+        - hostPath:
+            path: /var/lib/docker/containers
+          name: varlibdockercontainers
+        - hostPath:
+            path: /etc/machine-id
+            type: File
+          name: etcmachineid
+        - hostPath:
+            path: /var/lib/fluent-bit
+            type: DirectoryOrCreate
+          name: tail-db
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+---
+# Source: sumologic/charts/kube-prometheus-stack/charts/prometheus-node-exporter/templates/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: arcade-fluentd-prometheus-node-exporter
+  namespace: fluentd
+  labels:     
+    app: prometheus-node-exporter
+    heritage: Helm
+    release: arcade-fluentd
+    chart: prometheus-node-exporter-1.12.0
+    jobLabel: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: prometheus-node-exporter
+      release: arcade-fluentd
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:         
+        app: prometheus-node-exporter
+        heritage: Helm
+        release: arcade-fluentd
+        chart: prometheus-node-exporter-1.12.0
+        jobLabel: node-exporter
+    spec:
+      serviceAccountName: arcade-fluentd-prometheus-node-exporter
+      securityContext:
+        fsGroup: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+        runAsUser: 65534
+      containers:
+        - name: node-exporter
+          image: "quay.io/prometheus/node-exporter:v1.3.1"
+          imagePullPolicy: IfNotPresent
+          args:
+            - --path.procfs=/host/proc
+            - --path.sysfs=/host/sys
+            - --path.rootfs=/host/root
+            - --web.listen-address=$(HOST_IP):9200
+            - --collector.filesystem.ignored-mount-points=^/(dev|proc|sys|var/lib/docker/.+)($|/)
+            - --collector.filesystem.ignored-fs-types=^(autofs|binfmt_misc|cgroup|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|sysfs|tracefs)$
+          env:
+          - name: HOST_IP
+            value: 0.0.0.0
+          ports:
+            - name: metrics
+              containerPort: 9200
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9200
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9200
+          resources:
+            {}
+          volumeMounts:
+            - name: proc
+              mountPath: /host/proc
+              readOnly:  true
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+            - name: root
+              mountPath: /host/root
+              mountPropagation: HostToContainer
+              readOnly: true
+      hostNetwork: true
+      hostPID: true
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: root
+          hostPath:
+            path: /

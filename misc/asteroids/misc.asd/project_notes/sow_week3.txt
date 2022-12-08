@@ -1,0 +1,45 @@
+Tue Jan 19 18:23:47 EST 2021
+This file may be deleted as the tool emerges.
+
+
+##############################################################################
+Project 3: button up ASD
+
+#### Objective
+Wrap up the Asteroid Service Directory tooling as though it’s going to sit on
+the shelf a while. Next week we’ll embark on a similar new tool, which uses
+data in the Asteroid Service Directory.
+
+- Wrap up any loose ends or cleanup.
+
+#### TO-DO:
+Installer Clean Up:
+- reqs.py for dependencies
+- setup.py functional for installation
+- Basic Install Instructions in README.txt in root of repo
+- Ensure all tooling arguments are consistent across programs
+Bug:
+- ‘-v’ ‘-V’ broken
+
+#### Documentation:
+- README.txt - please take ownership of it and make sure it makes sense for
+  some new user.
+- docstrings for all methods
+- Documentation about JSON schema in base, add to README.txt
+  (Just point out that it’s there)
+
+#### Bonus:
+If installer is capable of generating pip-compatible output, instructions
+for making the pip asset would be handy to have for the future.
+
+#### Notes:
+- decision was made together, no config file is necessary for the tool,
+  (Particularly AOK as bucket flag can be set via ENV)
+- decision 
+
+#### Future Considerations:
+- Testing, opening this can of worms slowly:
+  - How can we functionally test the tooling?
+    - Can we use setup.py for barbarians to run tests (oldschool py)
+  - How could we provide test instruction to QA if we had their cycles?
+

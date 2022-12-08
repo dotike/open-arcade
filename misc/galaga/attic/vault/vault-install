@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+
+import boto3
+import logging
+import os
+import sys
+import json
+import time
+from python_terraform import *
+from arclib import common, dns, storage, grv
+from vault_import_vars import import_terraform_vars
+
+
+def create_terraform_infra(terraform_dir: str, terraform_tfvars: dict, bucket: str):
+    """Wrapper for deplyoing terraform
+
+    Args:
+        terraform_dir (str): [Directory path for terraform files]
+        terraform_tfvars (dict): [TFVARS]
+
+    Returns:
+        [stdout]: [Terraform output]
+    """
+    vault_name = os.environ.get("GALAGA_CLUSTER_NAME")
+    tf = Terraform(working_dir=terraform_dir)
+    t_init = tf.init(backend_config={
+        'bucket': bucket,
+        'key': f'terraform/{vault_name}/{os.environ.get("ARCADE_NAME")}.tf',
+        'region': os.environ.get("AWS_DEFAULT_REGION"),
+    })
+    return_code, stdout, stderr = tf.apply(skip_plan=True, refresh=False,
+                                           no_color=IsFlagged, var=terraform_tfvars)
+    logging.info(return_code)
+    if return_code == 0:
+        logging.info(return_code, stdout)
+        return 0
+    else:
+        logging.info(return_code, stderr)
+        return 1
+
+
+def main():
+    logging.info('Starting execute of terraform')
+    if os.environ.get('GALAGA_VERBOSE'):
+        logging.basicConfig(level=logging.INFO)
+
+    if common.check_dryrun(os.path.basename(__file__)):
+        sys.exit(0)
+
+    arcade_name = os.environ.get('ARCADE_NAME')
+    bucket = grv.get_infrastructure_bucket(arcade_name=arcade_name)
+    cluster_name = os.environ.get("GALAGA_CLUSTER_NAME")
+    full_name = f"{arcade_name.replace('_', '-').replace('.', ' ').split()[0]}-{cluster_name}"
+    logging.info(arcade_name)
+    vault_lock = storage.load_json(bucket, 'terraform/vault.json')
+    if 'cluster_name' in vault_lock.keys():
+        if vault_lock['cluster_name'] != full_name:
+            print(f"Vault {vault_lock['cluster_name']} already installed.  Not installing {cluster_name}")
+            sys.exit(0)
+    if arcade_name:
+        dns.create_arcade_zone(arcade_name, os.getenv('GALAGA_VAULT_DOMAIN'))
+        data = import_terraform_vars(grv_name=arcade_name)
+        logging.info(json.dumps(data, sort_keys=True, indent=4))
+        logging.info('Starting execute of terraform')
+        execute = create_terraform_infra(terraform_dir=f'{os.environ.get("MYHIER")}/libexec/installer/vault/terraform_data',
+                                         terraform_tfvars=data, bucket=bucket)
+        logging.info(execute)
+        if execute == 0:
+            json_data = json.dumps(data)
+            storage.upload_to_s3(bucket, json_data, 'terraform/vault.json')
+            print(f"Shamir keys can be find in {bucket}/vaultauth/{full_name}-keys.json")
+            sys.exit(0)
+        else:
+            sys.exit(1)
+    else:
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

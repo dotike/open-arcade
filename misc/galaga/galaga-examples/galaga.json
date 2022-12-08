@@ -1,0 +1,12 @@
+{
+    "service": "galaga",
+    "version": 1,
+    "components": [
+      {
+        "alb": 1
+      },
+      {
+        "eks": 1
+      }
+    ]
+}

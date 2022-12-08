@@ -1,0 +1,14 @@
+{
+    "name": "nodegroup",
+    "component_type": "nodegroup",
+    "version": 3,
+    "description": "Module to create an EKS nodegroup in AWS",
+    "dependencies": ["eks", "alb"],
+    "service_options": {
+        "cluster_prefix": "asteroids",
+        "nodes": "4",
+        "max_nodes": "4",
+        "instance_type": "r5.xlarge",
+        "size": "20"
+    }
+}

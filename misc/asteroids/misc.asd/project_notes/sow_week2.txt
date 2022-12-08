@@ -1,0 +1,50 @@
+Mon Jan 11 16:46:22 EST 2021
+This file may be deleted as the tool emerges.
+
+##############################################################################
+Project 2: ASD uploader tool features
+
+#### Feature 1, validation:
+- Validate based on a JSON schema (any boilerplate from internet will do)
+  - Place JSON schema in the root of the ASD bucket, as known file URI
+
+Block writes for file upload, until JSON is validated against schema:
+  - start keeping schema source in repo, as schema content source of truth for now
+  - tool should fetch the one in the S3 bucket, for validation before upload
+
+#### Feature 2, initialize when new S3 bucket is created for ASD:
+- begin ‘init’ tool: initialization tooling for S3 bucket
+  - upload JSON schema to S3 bucket (only feature of ‘init’ for now
+  - leave room for future ‘init’ needs,
+    (other things to massage in S3 bucket before asd tool is usable)
+  - aim for idempotency, (e.g. if file exists, simply overwrite it)
+  - init can be feature of asd tool, or separate small tool, whatever works
+
+#### Feature 3, basic search
+- Ability to perform searches for files based on date ranges.
+  - Given some date range at the CLI, return all URI paths which exist.
+  - command line flags for date formatting up to you, I suggest
+    mimicking some UNIX utility like cal(1) or date(1)
+
+#### BONUS: Feature 4,
+If you have time, it’s worth taking a whack at an installer for asd.
+Installation intent:
+- Install the asd tool(s) on a UNIX system, in user's the $PATH
+- Intent that the tool be installed and usable *without* the git repository available.
+- Rough pass expected here, using any installer technology which is generally portable across UNIX systems, (We use our Mac systems, and at the moment, Ubuntu).
+
+#### BONUS: Feature 5, (from chat discussion),
+- Feature, provide fetch/download of the file content,
+  when asd is provided the URI of an uploaded file
+- First pass, printing JSON to stdout is more than adequate.
+
+#### “Stub” for future requirements
+- Some idea of minimal ‘configuration’ for ASD is inevitable, specifically:
+  - config to point ASD at specific S3 bucket
+  - it would be useful if asd config be override-able via ENV variables
+  - we use ~/.namedtool config as a convention already, but open to new ideas
+
+#### Sharing other code from discussion earlier,
+- Our “Gravitar” layer uses this tool:
+  https://github.com/dotike/vic
+

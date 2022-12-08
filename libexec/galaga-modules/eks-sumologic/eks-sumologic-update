@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# -*- coding: utf-8 -*-
+
+'''
+eks-sumologic-create -- GALAGA update sumologic componet
+'''
+
+# @depends: python (>=3.9)
+__version__ = '0.1'
+__author__ = 'Addepar Infrastructure Platform Tools Team <iptools@addepar.com>'
+__description__ = "Create the ASTEROIDS infrastructure."
+
+
+# TODO 
