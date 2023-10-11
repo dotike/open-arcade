@@ -1,0 +1,1005 @@
+Delivered-To: ike.levy@addepar.com
+Received: by 2002:ac9:7ad3:0:b0:4fa:be7d:ac6c with SMTP id y19csp1023791ocq;
+        Wed, 11 Oct 2023 08:47:53 -0700 (PDT)
+X-Received: by 2002:a17:906:bcf0:b0:9a6:1446:852c with SMTP id op16-20020a170906bcf000b009a61446852cmr20424624ejb.27.1697039272971;
+        Wed, 11 Oct 2023 08:47:52 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1697039272; cv=none;
+        d=google.com; s=arc-20160816;
+        b=FvgzKb/FgkVuHBmBUwupxfUGGKHfUdw7oSunT2BPWm0YDrYwnu3adBvhjagPbh46fz
+         bdZ9ZLCw6wgQC6viyOeT1FMsQs+tldJZv8+iBbfjWjtEWMgli0tt14HBBRcy5tJ+GJ0P
+         Z1tb/eWJZsdDSaZ4JG67MhnIxC6TSYkn0E3Epy/ywjb4ghwfNIvMpOs0I+iG/OvNhdnS
+         SIBrlIprm+qtjzbft8d2tnN8WiuJ7d1Exk+pmdfKFp1eZSk9/g+a9bbthItyf6WL94ci
+         tdbQmfkVC/WjiQWsbYpqK9kmKN7pU5LhlF4bvqzQkzm0bTL8KOXw3PqOs2bOVYNS959E
+         B+7g==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20160816;
+        h=to:subject:message-id:date:from:in-reply-to:references:mime-version
+         :dkim-signature;
+        bh=K/jJRE1ZEcrtHF/bxP87BWYfwKD9wY1oG+lpW8hONoY=;
+        fh=Q8b3R8mYKqiZitzkHtgCRYT9FyfAaIAF46eZhzezGmI=;
+        b=EyauDmBtAwAkhFDTbYvbtuqiTE2lDg4R8JHbQgA7yA+cmTo8YEBPaw1zI+lQkq6O5Q
+         YS3OdxXr2Hm4RAwx59L/f1AXjPvgjPPBcB+eA+RIdgQNyN4q0k67LwI8AqVyZK5Exv7W
+         Ofc74eUcKbJH+jGBxDWVwTPauop9BY5n/Z70J+JpECZ2s6YVVA1BAjy3zJwm/FV5gCaq
+         8vPaVQIOgyq8pVYzS3a2B+NMfaQ1mECAuTPNEuYRD74Mbx5QugcKFRwg9CezKZnDckLR
+         oDEK+znviOPP7SuK+3DtNgDhsF2fF1Aw1L5XuX82q0crSbTB28pkBbIBMMqYbUp+Xf3S
+         YgzA==
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@addepar.com header.s=addepar header.b=Gp2yCIpV;
+       spf=pass (google.com: domain of jb.zimmerman@addepar.com designates 209.85.220.41 as permitted sender) smtp.mailfrom=jb.zimmerman@addepar.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=addepar.com
+Return-Path: <jb.zimmerman@addepar.com>
+Received: from mail-sor-f41.google.com (mail-sor-f41.google.com. [209.85.220.41])
+        by mx.google.com with SMTPS id qb34-20020a1709077ea200b009a5d99303c5sor1812961ejc.2.2023.10.11.08.47.52
+        for <ike.levy@addepar.com>
+        (Google Transport Security);
+        Wed, 11 Oct 2023 08:47:52 -0700 (PDT)
+Received-SPF: pass (google.com: domain of jb.zimmerman@addepar.com designates 209.85.220.41 as permitted sender) client-ip=209.85.220.41;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@addepar.com header.s=addepar header.b=Gp2yCIpV;
+       spf=pass (google.com: domain of jb.zimmerman@addepar.com designates 209.85.220.41 as permitted sender) smtp.mailfrom=jb.zimmerman@addepar.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=addepar.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=addepar.com; s=addepar; t=1697039272; x=1697644072; darn=addepar.com;
+        h=to:subject:message-id:date:from:in-reply-to:references:mime-version
+         :from:to:cc:subject:date:message-id:reply-to;
+        bh=K/jJRE1ZEcrtHF/bxP87BWYfwKD9wY1oG+lpW8hONoY=;
+        b=Gp2yCIpVhLA4vSMZmawp97YStIABFRLteMdh2JRSBrleuwqBG6VUT3sFFyEwNse+5h
+         Ndg312WbMOnZEeNE/bgpaGQSvapGSzH1ZxH2fu55/BuA9VmQKSkkycrSyykph8jUbIwY
+         lotyGxBo4d2XDoXYXGCk52GbgiuALmnAQBdfY=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20230601; t=1697039272; x=1697644072;
+        h=to:subject:message-id:date:from:in-reply-to:references:mime-version
+         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
+        bh=K/jJRE1ZEcrtHF/bxP87BWYfwKD9wY1oG+lpW8hONoY=;
+        b=dkZ1MoFkHpIUoJyO5KMQWjIV1AXP2udInKMaDqLDWDJVu/DodrCe5Iffb1w/5N42Ag
+         udWCWC2CJK0U7uEiva93DJuWjhdZ05jo3emorgudz6ouNW8mKFm9pPlc8+wbXN4y9a5+
+         3As8/wYVU4S9PKdOMr0ERME1DVxVyDrlcvPifHVsF6mll0W3cqDEMXR5+pJ4qB9HzWXs
+         psYO68bzLxGso92dTAI1mvnocaDv2GRgFSm90C73opexdwU+PWcRwV+Xf7DUJmV4+mUC
+         Lv55sLqTVhrrPqR0C9X346RUcUb7+/cR/xGHsDeiBw+oAt/HoQg+NajMqbcrDfQ9yq1m
+         EebQ==
+X-Gm-Message-State: AOJu0YyUJ56pKq3f96as0Ha8SEgyItUVQY9lHQRaStSduE9su5rvrPcH
+	ZNFZU6rTZYb/X03wDiZFVojXG72tQDgzqPwZIUo25UmpqsoJzXWNB+pXQlUuhXmE/tk3bTUhEqP
+	QNylDFB57nYd3ayr+OzUZQYlpnX7ZPL+m0AMC7usVt4iWG8pM2Vunt22rNh4xyfdOLywXoNhn+J
+	kviOr3SYfpsIag+S1uFRTTQnxXophpFGgsbARCdN80iP0OxHBnHDzM6TiY2A4CJPQqvM/nuw==
+X-Google-Smtp-Source: AGHT+IF7We5wciLWoEO4MXBehAPU/5mPIpJZFF7QLO1/b3XLW18Nd/ubDBQS8RGc+XCRX5rk0ClBhAQJBjn1XaFgWF8=
+X-Received: by 2002:a17:906:7389:b0:9ae:2f35:442a with SMTP id
+ f9-20020a170906738900b009ae2f35442amr18988013ejl.5.1697039271574; Wed, 11 Oct
+ 2023 08:47:51 -0700 (PDT)
+MIME-Version: 1.0
+References: <CAF7rkUr3MGHO_MHt6vfQxwd-aVU=W3zQVe0S8s1TNvtHTrzgyw@mail.gmail.com>
+ <CABy8PyerCX2-gY-vb_k8LLvYiu5SUAf8UmafSSW0rH9RYfF9jQ@mail.gmail.com>
+ <CAL=R2LWFZCFB4JL-K2yRqOvrZw-JZtOx6pngvy1qc0QTwJNHQQ@mail.gmail.com>
+ <CABy8PycWMBxG41MFJ0T7Pq09vfChD_MwY44anv=DK80RsOxnTQ@mail.gmail.com>
+ <CAF7rkUqbMvGmN0T+oMa61=RM5mpqc8x4jaBFvC9_mLtoAzEw9A@mail.gmail.com>
+ <CAF7rkUqLRiH-GpA6_QooF_goYPSN3e64E_aypBS+t7p6nPusgg@mail.gmail.com>
+ <CAL=R2LUmtMHedMLUFXTLbBE1-89hsMsN1t01j8Ld4DLViJRD3g@mail.gmail.com>
+ <CABy8Pyf6uLiCyNbY-SiwqHjhMHtXOmbC6F+D3VaoSrRgWqOw-A@mail.gmail.com>
+ <CAF7rkUrOKtP7wyX2JJ4Bg7jr3kKZUet_fuyJOzPVD=eP+2ZGxg@mail.gmail.com>
+ <CAF7rkUrOSoeFpAHjxcLCmwWv-H17V-55E0meUOUdVaRfM49y6w@mail.gmail.com>
+ <CABy8PyfqYwH5djn_SE7EzDVLRqkJpbinx9Q4HYpZzq+hT9FNCA@mail.gmail.com>
+ <CAF7rkUp-tffSdfAs=HcWxR2s=WY--i8bQuFdtjfSpL_mPP_tPw@mail.gmail.com>
+ <CABy8Pyf_Zm-oUy6=8RFCgJP0JhH7-WWUCj10zdEKdNtMs=0e0Q@mail.gmail.com>
+ <CAL=R2LXs-mXvWoawdR-wAzUO53Er8ZQmSyXzhopvOh56zp0P+A@mail.gmail.com>
+ <CAL=R2LX8LxURXxmH960EzyYfhg5DS1AbAiGcaesghPz6u5im3w@mail.gmail.com>
+ <CAF7rkUqr869ryQ3ek+uk49_0o8hAWs2Ne-zNn0graN_EQM73UA@mail.gmail.com>
+ <CAF7rkUrZNt8Beq3CbnrxhThKqVxsCTtb7Un0wty1JT-u=BDcQw@mail.gmail.com>
+ <CAF7rkUrW-_ZbXoXjCbUjsy=U5+mcjojNarTEbV2SF00dxuLEOQ@mail.gmail.com> <CAL=R2LUjqm060e5uwj_ZqU28LCabKo6KgeY9DzNqM=cDW2kzWA@mail.gmail.com>
+In-Reply-To: <CAL=R2LUjqm060e5uwj_ZqU28LCabKo6KgeY9DzNqM=cDW2kzWA@mail.gmail.com>
+From: "J.B. Zimmerman" <jb.zimmerman@addepar.com>
+Date: Wed, 11 Oct 2023 11:47:39 -0400
+Message-ID: <CAF7rkUp7CXdUOhaxVMTgSghV+0jCnTCw_ddYwiZGw64XzHqccw@mail.gmail.com>
+Subject: Fwd: Open-sourcing the ARCADE toolset
+To: Isaac Levy <ike.levy@addepar.com>
+Content-Type: multipart/alternative; boundary="000000000000f424cc060772be33"
+
+--000000000000f424cc060772be33
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hey, as per Matt S below, plz add an opensource license into the
+open-arcade repo.  Thanks!
+
+jb
+
+---------- Forwarded message ---------
+From: Matt Sperling <Matt@addepar.com>
+Date: Wed, Oct 11, 2023 at 11:28=E2=80=AFAM
+Subject: Re: Open-sourcing the ARCADE toolset
+To: J.B. Zimmerman <jb.zimmerman@addepar.com>
+
+
+BSD or MIT is fine, we've used MIT in the past as the simplest:
+*****************************
+Copyright (C) <year> Addepar, Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+******************************
+
+
+*Matt Sperling**Associate General Counsel*
+matt@addepar.com
+(650) 265-0648
+
+
+
+
+On Wed, Oct 11, 2023 at 6:46=E2=80=AFAM J.B. Zimmerman <jb.zimmerman@addepa=
+r.com>
+wrote:
+
+> Matt-
+>    I know this is a blast from the past, but...still looking to get
+> initial publication of this repo.  What license would Addepar like placed
+> on it to make it available?  We need to make that commit.  Thanks.
+>
+> JB
+>
+> On Mon, Mar 13, 2023 at 3:16=E2=80=AFPM J.B. Zimmerman <jb.zimmerman@adde=
+par.com>
+> wrote:
+>
+>> Matt-
+>>
+>>   We have removed that Addepar reference (and a couple additional stray
+>> names as well).
+>>
+>> JB
+>>
+>> On Fri, Mar 3, 2023 at 3:19=E2=80=AFPM J.B. Zimmerman <jb.zimmerman@adde=
+par.com>
+>> wrote:
+>>
+>>> That's a good point, Matt, and I'll raise that with Ike.  It doesn't
+>>> cause us any vulnerability, it would mostly just be an annoyance, but e=
+ven
+>>> in that case it sort of makes sense - it would serve to isolate the con=
+fig
+>>> information for this system on the user's system.  We could probably ch=
+ange
+>>> it to /etc/arcade/configs reasonably.
+>>>
+>>> JB
+>>>
+>>> On Fri, Mar 3, 2023 at 2:25=E2=80=AFPM Matt Sperling <Matt@addepar.com>=
+ wrote:
+>>>
+>>>> The only thing I spotted in my review was a line in the readme file
+>>>> saying " If you don't specify a path for the file, it will be mounted =
+to
+>>>> /etc/addepar/configs."  Does that make sense to include for non-Addepa=
+r
+>>>> audience?
+>>>>
+>>>>
+>>>> *Matt Sperling**Associate General Counsel*
+>>>> matt@addepar.com
+>>>> (650) 265-0648
+>>>>
+>>>>
+>>>>
+>>>>
+>>>> On Thu, Mar 2, 2023 at 8:51=E2=80=AFAM Matt Sperling <Matt@addepar.com=
+> wrote:
+>>>>
+>>>>> Because I don't have a GitHub seat, I've relied on assurances and the
+>>>>> review of others regarding removal of Addepar-specific info.  I have =
+not
+>>>>> done my own review.  That probably won't scale with our open source
+>>>>> practices, so let me look into getting GitHub access and then I can r=
+eview
+>>>>> this before we release.
+>>>>>
+>>>>>
+>>>>> *Matt Sperling**Associate General Counsel*
+>>>>> matt@addepar.com
+>>>>> (650) 265-0648
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>> On Thu, Mar 2, 2023 at 8:40=E2=80=AFAM Karen Brooks <karen.brooks@add=
+epar.com>
+>>>>> wrote:
+>>>>>
+>>>>>> Hi JB - Quick follow up here, the SecEng team found secrets in clear
+>>>>>> text in the ARCADE code in their ticket. Have these been removed? If=
+ not,
+>>>>>> please let us know once they're cleaned up, we shouldn't publish cod=
+e with
+>>>>>> hardcoded secrets.
+>>>>>>
+>>>>>> Matt - I recall you were also going to confirm there's no client
+>>>>>> references or other apparent information disclosure as a sanity chec=
+k. Was
+>>>>>> this done as part of your review?
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> On Wed, Mar 1, 2023 at 12:01 PM J.B. Zimmerman <
+>>>>>> jb.zimmerman@addepar.com> wrote:
+>>>>>>
+>>>>>>> No worry, thanks!
+>>>>>>>
+>>>>>>> On Wed, Mar 1, 2023 at 11:33=E2=80=AFAM Karen Brooks <
+>>>>>>> karen.brooks@addepar.com> wrote:
+>>>>>>>
+>>>>>>>> Appreciate the ping, JB, I didn't see your last email. Will reach
+>>>>>>>> out 1:1.
+>>>>>>>>
+>>>>>>>> On Wed, Mar 1, 2023 at 11:20 AM J.B. Zimmerman <
+>>>>>>>> jb.zimmerman@addepar.com> wrote:
+>>>>>>>>
+>>>>>>>>> Checking in on this.  Am I clear to publish the code?  Thanks!
+>>>>>>>>>
+>>>>>>>>> JB
+>>>>>>>>>
+>>>>>>>>> On Mon, Feb 13, 2023 at 12:20=E2=80=AFPM J.B. Zimmerman <
+>>>>>>>>> jb.zimmerman@addepar.com> wrote:
+>>>>>>>>>
+>>>>>>>>>> Here you go. https://addepar.atlassian.net/browse/SECENG-1587
+>>>>>>>>>>
+>>>>>>>>>> On Mon, Feb 13, 2023 at 8:56 AM Karen Brooks <
+>>>>>>>>>> karen.brooks@addepar.com> wrote:
+>>>>>>>>>>
+>>>>>>>>>>> J.B. - Please send me the ticket with the results of the SecEng
+>>>>>>>>>>> scan.
+>>>>>>>>>>>
+>>>>>>>>>>> Thanks,
+>>>>>>>>>>> Karen
+>>>>>>>>>>>
+>>>>>>>>>>> On Fri, Feb 10, 2023 at 4:26 PM Matt Sperling <Matt@addepar.com=
+>
+>>>>>>>>>>> wrote:
+>>>>>>>>>>>
+>>>>>>>>>>>> All set from Legal.
+>>>>>>>>>>>>
+>>>>>>>>>>>> On Fri, Feb 10, 2023, 12:28 PM J.B. Zimmerman <
+>>>>>>>>>>>> jb.zimmerman@addepar.com> wrote:
+>>>>>>>>>>>>
+>>>>>>>>>>>>> Hello folks!  A quick update, I'm looking to push forward wit=
+h
+>>>>>>>>>>>>> the open sourcing of the ARCADE code.  Recent updates - Matt =
+S. has looked
+>>>>>>>>>>>>> at the licenses in the repo (
+>>>>>>>>>>>>> https://github.com/addepar/open-arcade) and confirmed that
+>>>>>>>>>>>>> they are appropriate.  In addition, Henry Prince did a scan o=
+f the
+>>>>>>>>>>>>> repository and came up with a list of what he called false po=
+sitives - out
+>>>>>>>>>>>>> of caution, Ike Levy has removed most of those and confirmed =
+the others are
+>>>>>>>>>>>>> not secret hashes where appropriate, and then recleaned the r=
+epository to a
+>>>>>>>>>>>>> state where it can be published.
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> Are there any other steps I need to follow before making this
+>>>>>>>>>>>>> repository available to the public?
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> Thanks!
+>>>>>>>>>>>>> JB
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> On Tue, Dec 13, 2022 at 8:56 AM J.B. Zimmerman <
+>>>>>>>>>>>>> jb.zimmerman@addepar.com> wrote:
+>>>>>>>>>>>>>
+>>>>>>>>>>>>>> That copyright is from legacy code that went *into* the
+>>>>>>>>>>>>>> project.  We will add whatever copyright legal recommends on=
+ what is
+>>>>>>>>>>>>>> published.
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> JB
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> On Tue, Dec 13, 2022 at 8:46 AM Karen Brooks <
+>>>>>>>>>>>>>> karen.brooks@addepar.com> wrote:
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>> Thanks, Matt. Can you clarify if this will be copyrighted a=
+s
+>>>>>>>>>>>>>>> Addepar software, or a personal copyright? The current lice=
+nse is personal:
+>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>> *Copyright (c) 2012-2018 Isaac (.ike) Levy
+>>>>>>>>>>>>>>> <ike@blackskyresearch.net <ike@blackskyresearch.net>>.All r=
+ights reserved. *
+>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>> If this changes to Addepar copyrighted software, we should
+>>>>>>>>>>>>>>> include a final security review/scan, so any critical vulne=
+rabilities can
+>>>>>>>>>>>>>>> be remediated before we publish.
+>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>> Karen
+>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>> On Mon, Dec 12, 2022 at 7:26 PM Matt Sperling <
+>>>>>>>>>>>>>>> Matt@addepar.com> wrote:
+>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>> Hi Karen,
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>> JB and I spoke last week and JB proactively mentioned that
+>>>>>>>>>>>>>>>> he intends to take whatever steps necessary to remove or r=
+evert
+>>>>>>>>>>>>>>>> Addepar-specific aspects of the project.  Thanks for shari=
+ng that reference
+>>>>>>>>>>>>>>>> material on scrubbing, we haven't released code enough tim=
+es to have our
+>>>>>>>>>>>>>>>> own playbooks.  Once we've removed references to Addepar c=
+ode, users,
+>>>>>>>>>>>>>>>> tools, etc. (and anything else that doesn't belong) from t=
+he repo, no
+>>>>>>>>>>>>>>>> issues on my end and I'm happy to do a code review before =
+release.
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>> And just for the sake of completeness on Legal's philosoph=
+y
+>>>>>>>>>>>>>>>> here, these were my thoughts in our other thread:
+>>>>>>>>>>>>>>>> 1) Landing on the permissive side of this type of release
+>>>>>>>>>>>>>>>> strategy can improve the employee experience of defunding =
+projects.  You
+>>>>>>>>>>>>>>>> get to say, "Yes, Addepar is moving away from it, but no, =
+the work doesn't
+>>>>>>>>>>>>>>>> go into a black hole unless there's a real reason to put i=
+t in one."
+>>>>>>>>>>>>>>>> 2) The effort needed from Legal to make it happen is very
+>>>>>>>>>>>>>>>> light, not a factor.
+>>>>>>>>>>>>>>>> 3) Many engineers I speak to care about the spirit of open
+>>>>>>>>>>>>>>>> source being both give and take, and we get an opportunity=
+ to walk the walk
+>>>>>>>>>>>>>>>> when we can migrate projects into the open source communit=
+y regardless of
+>>>>>>>>>>>>>>>> whether they began as proprietary projects.
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>> Always other factors to consider in the big picture, but
+>>>>>>>>>>>>>>>> glad to see we're willing to support this when it makes se=
+nse.
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>> Best,
+>>>>>>>>>>>>>>>> Matt
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>> *Matt Sperling**Associate General Counsel*
+>>>>>>>>>>>>>>>> matt@addepar.com
+>>>>>>>>>>>>>>>> (650) 265-0648
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>> On Mon, Dec 12, 2022 at 2:41 PM Karen Brooks <
+>>>>>>>>>>>>>>>> karen.brooks@addepar.com> wrote:
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>> Hi JB,
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>> Legal owns the Open Source Guidelines: here:
+>>>>>>>>>>>>>>>>> https://addepar.atlassian.net/wiki/spaces/EN/pages/140744=
+780/Open+Source+Guidelines
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>> Text: *"While Addepar owns several open source projects
+>>>>>>>>>>>>>>>>> <http://opensource.addepar.com/>, they are not very activ=
+ely maintained.
+>>>>>>>>>>>>>>>>> Furthermore, we have not released anything new recently. =
+As such, we don't
+>>>>>>>>>>>>>>>>> have good guidance on how to release new projects yet. If=
+ you have a good
+>>>>>>>>>>>>>>>>> candidate, please reach out to Addepar's Legal team (lega=
+l@addepar.com
+>>>>>>>>>>>>>>>>> <legal@addepar.com>)."*
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>> Since Addepar isn't active in the open source arena,
+>>>>>>>>>>>>>>>>> it looks like this will be a judgment call from Legal's p=
+erspective. I
+>>>>>>>>>>>>>>>>> agree with removing all references to Addepar / AMP, and =
+ensuring license
+>>>>>>>>>>>>>>>>> terms are clear, and recommend that Legal perform a four-=
+eyes check to
+>>>>>>>>>>>>>>>>> confirm the repo docs are sanitized.
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>> Matt - If it's helpful, Google publishes their internal
+>>>>>>>>>>>>>>>>> open source process publicly. It includes suggested searc=
+h commands to help
+>>>>>>>>>>>>>>>>> confirm the project has been scrubbed before publishing:
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>    -
+>>>>>>>>>>>>>>>>>    https://opensource.google/documentation/reference/rele=
+asing
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>    -
+>>>>>>>>>>>>>>>>>    https://opensource.google/documentation/reference/rele=
+asing/preparing#scrub-the-comments
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>> Best,
+>>>>>>>>>>>>>>>>> Karen
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>> On Mon, Dec 12, 2022 at 7:39 AM J.B. Zimmerman <
+>>>>>>>>>>>>>>>>> jb.zimmerman@addepar.com> wrote:
+>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>> Karen-
+>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>>   With Mitch, Matt and Ruchir's approval, I would like t=
+o
+>>>>>>>>>>>>>>>>>> proceed with making the ARCADE tooling and documentation=
+ available for
+>>>>>>>>>>>>>>>>>> open-source use.  We have a 'sanitized' version of the r=
+epository which has
+>>>>>>>>>>>>>>>>>> had (to the best of our knowledge) all Addepar-specific =
+information
+>>>>>>>>>>>>>>>>>> removed, including being published as a squash commit to=
+ remove commit
+>>>>>>>>>>>>>>>>>> message leakage.  We would be publishing it 'as is' unde=
+r (I believe, Matt
+>>>>>>>>>>>>>>>>>> said) the BSD license.
+>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>>   With that in mind, are there any examinations, audits
+>>>>>>>>>>>>>>>>>> or mechanical scans you would like me to have done on th=
+is new code repo
+>>>>>>>>>>>>>>>>>> ('open-arcade') before proceeding?
+>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>> Thanks,
+>>>>>>>>>>>>>>>>>> JB
+>>>>>>>>>>>>>>>>>> --
+>>>>>>>>>>>>>>>>>> J.B. Zimmerman
+>>>>>>>>>>>>>>>>>> Sr. Director, Engineering | Addepar
+>>>>>>>>>>>>>>>>>> <https://addepar.com/>
+>>>>>>>>>>>>>>>>>> 335 Madison Ave Ste. #2501, New York, NY 10017
+>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> --
+>>>>>>>>>>>>>> J.B. Zimmerman
+>>>>>>>>>>>>>> Sr. Director, Engineering | Addepar <https://addepar.com/>
+>>>>>>>>>>>>>> 335 Madison Ave Ste. #2501, New York, NY 10017
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> --
+>>>>>>>>>>>>> J.B. Zimmerman
+>>>>>>>>>>>>> Sr. Director, Engineering | Addepar <https://addepar.com/>
+>>>>>>>>>>>>> 335 Madison Ave Ste. #2501, New York, NY 10017
+>>>>>>>>>>>>>
+>>>>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> --
+>>>>>>>>>> J.B. Zimmerman
+>>>>>>>>>> Sr. Director, Engineering | Addepar <https://addepar.com/>
+>>>>>>>>>> 335 Madison Ave Ste. #2501, New York, NY 10017
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> --
+>>>>>>>>> J.B. Zimmerman
+>>>>>>>>> Sr. Director, Engineering | Addepar <https://addepar.com/>
+>>>>>>>>> 335 Madison Ave Ste. #2501, New York, NY 10017
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>
+>>>>>>> --
+>>>>>>> J.B. Zimmerman
+>>>>>>> Sr. Director, Engineering | Addepar <https://addepar.com/>
+>>>>>>> 335 Madison Ave Ste. #2501, New York, NY 10017
+>>>>>>>
+>>>>>>>
+>>>
+>>> --
+>>> J.B. Zimmerman
+>>> Sr. Director, Engineering | Addepar <https://addepar.com/>
+>>> 335 Madison Ave Ste. #2501, New York, NY 10017
+>>>
+>>>
+>>
+>> --
+>> J.B. Zimmerman
+>> Sr. Director, Engineering | Addepar <https://addepar.com/>
+>> 335 Madison Ave Ste. #2501, New York, NY 10017
+>>
+>>
+>
+> --
+> J.B. Zimmerman
+> Sr. Director, Engineering | Addepar <https://addepar.com/>
+> 335 Madison Ave 25th fl, New York, NY 10017
+>
+>
+
+--=20
+J.B. Zimmerman
+Sr. Director, Engineering | Addepar <https://addepar.com/>
+335 Madison Ave 25th fl, New York, NY 10017
+
+--000000000000f424cc060772be33
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr">Hey, as per Matt S below, plz add an opensource license in=
+to the open-arcade repo.=C2=A0 Thanks!<div><br></div><div>jb<br><br><div cl=
+ass=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">---------- Forwar=
+ded message ---------<br>From: <strong class=3D"gmail_sendername" dir=3D"au=
+to">Matt Sperling</strong> <span dir=3D"auto">&lt;<a href=3D"mailto:Matt@ad=
+depar.com">Matt@addepar.com</a>&gt;</span><br>Date: Wed, Oct 11, 2023 at 11=
+:28=E2=80=AFAM<br>Subject: Re: Open-sourcing the ARCADE toolset<br>To: J.B.=
+ Zimmerman &lt;<a href=3D"mailto:jb.zimmerman@addepar.com">jb.zimmerman@add=
+epar.com</a>&gt;<br></div><br><br><div dir=3D"ltr">BSD or MIT is fine, we&#=
+39;ve used MIT in the past as the simplest:<div>***************************=
+**</div><div>Copyright (C) &lt;year&gt; Addepar, Inc.<br><br>Permission is =
+hereby granted, free of charge, to any person obtaining a copy of this soft=
+ware and associated documentation files (the &quot;Software&quot;), to deal=
+ in the Software without restriction, including without limitation the righ=
+ts to use, copy, modify, merge, publish, distribute, sublicense, and/or sel=
+l copies of the Software, and to permit persons to whom the Software is fur=
+nished to do so, subject to the following conditions:<br><br>The above copy=
+right notice and this permission notice shall be included in all copies or =
+substantial portions of the Software.<br><br>THE SOFTWARE IS PROVIDED &quot=
+;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING B=
+UT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICUL=
+AR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT =
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN =
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTIO=
+N WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</div><div=
+>******************************<br clear=3D"all"><div><div dir=3D"ltr" clas=
+s=3D"gmail_signature" data-smartmail=3D"gmail_signature"><div dir=3D"ltr"><=
+div><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div =
+dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"=
+ltr"><div dir=3D"ltr"><div dir=3D"ltr"><p></p><div style=3D"background-colo=
+r:rgb(255,255,255)"><div dir=3D"ltr"><b><font face=3D"georgia, serif" size=
+=3D"4" color=3D"#134f5c">Matt Sperling</font><br></b><b><font color=3D"#444=
+444"><span style=3D"font-family:Arial,sans-serif">Associate General Counsel=
+</span></font></b><font face=3D"Arial, sans-serif" style=3D"color:rgb(34,34=
+,34);font-family:arial,sans-serif"><br></font></div><div><font face=3D"Aria=
+l, sans-serif" color=3D"#444444"><a href=3D"mailto:matt@addepar.com" target=
+=3D"_blank">matt@addepar.com</a></font></div><div dir=3D"ltr"><font color=
+=3D"#444444"><font face=3D"Arial, sans-serif">(650) 265-0648</font><span st=
+yle=3D"font-family:Arial,sans-serif">=C2=A0</span></font></div><div dir=3D"=
+ltr"><font color=3D"#444444"><span style=3D"font-family:Arial,sans-serif"><=
+br></span></font></div><div dir=3D"ltr"><font color=3D"#444444"><span style=
+=3D"font-family:Arial,sans-serif"><img src=3D"https://addepar.com/assets/lo=
+go/addepar-logo-dark-150px.png" width=3D"96" height=3D"17"><br></span></fon=
+t></div></div><p></p></div></div></div></div></div></div></div></div></div>=
+</div></div></div></div></div></div></div></div><br></div></div><br><div cl=
+ass=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Wed, Oct 11, 2=
+023 at 6:46=E2=80=AFAM J.B. Zimmerman &lt;<a href=3D"mailto:jb.zimmerman@ad=
+depar.com" target=3D"_blank">jb.zimmerman@addepar.com</a>&gt; wrote:<br></d=
+iv><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;bord=
+er-left:1px solid rgb(204,204,204);padding-left:1ex"><div dir=3D"ltr">Matt-=
+<div>=C2=A0 =C2=A0I know this is a blast from the past, but...still looking=
+ to get initial publication=C2=A0of this repo.=C2=A0 What license would Add=
+epar like placed on it to make it available?=C2=A0 We need to make that com=
+mit.=C2=A0 Thanks.</div><div><br></div><div>JB</div></div><br><div class=3D=
+"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Mon, Mar 13, 2023 at=
+ 3:16=E2=80=AFPM J.B. Zimmerman &lt;<a href=3D"mailto:jb.zimmerman@addepar.=
+com" target=3D"_blank">jb.zimmerman@addepar.com</a>&gt; wrote:<br></div><bl=
+ockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-lef=
+t:1px solid rgb(204,204,204);padding-left:1ex"><div dir=3D"ltr">Matt-<div><=
+br></div><div>=C2=A0 We have removed that Addepar reference (and a couple a=
+dditional stray names as well).</div><div><br></div><div>JB</div></div><br>=
+<div class=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Fri, Ma=
+r 3, 2023 at 3:19=E2=80=AFPM J.B. Zimmerman &lt;<a href=3D"mailto:jb.zimmer=
+man@addepar.com" target=3D"_blank">jb.zimmerman@addepar.com</a>&gt; wrote:<=
+br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8e=
+x;border-left:1px solid rgb(204,204,204);padding-left:1ex"><div dir=3D"ltr"=
+><div>That&#39;s a good point, Matt, and I&#39;ll raise that with Ike.=C2=
+=A0 It doesn&#39;t cause us any vulnerability, it would mostly just be an a=
+nnoyance, but even in that case it sort of makes sense - it would=C2=A0serv=
+e to isolate=C2=A0the config information for this system on the user&#39;s =
+system.=C2=A0 We could probably change it to /etc/arcade/configs reasonably=
+.</div><div><br></div><div>JB</div><div><br></div><div class=3D"gmail_quote=
+"><div dir=3D"ltr" class=3D"gmail_attr">On Fri, Mar 3, 2023 at 2:25=E2=80=
+=AFPM Matt Sperling &lt;<a href=3D"mailto:Matt@addepar.com" target=3D"_blan=
+k">Matt@addepar.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quot=
+e" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204)=
+;padding-left:1ex"><div dir=3D"ltr">The only thing I spotted in my review w=
+as a line in the readme file saying &quot; If you don&#39;t specify a path =
+for the file, it will be mounted to /etc/addepar/configs.&quot; =C2=A0Does =
+that make sense to include for non-Addepar audience?<br clear=3D"all"><div>=
+<div dir=3D"ltr"><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"lt=
+r"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D=
+"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><=
+p></p><div style=3D"background-color:rgb(255,255,255)"><div dir=3D"ltr"><b>=
+<font face=3D"georgia, serif" size=3D"4" color=3D"#134f5c">Matt Sperling</f=
+ont><br></b><b><font color=3D"#444444"><span style=3D"font-family:Arial,san=
+s-serif">Associate General Counsel</span></font></b><font face=3D"Arial, sa=
+ns-serif" style=3D"color:rgb(34,34,34);font-family:arial,sans-serif"><br></=
+font></div><div><font face=3D"Arial, sans-serif" color=3D"#444444"><a href=
+=3D"mailto:matt@addepar.com" target=3D"_blank">matt@addepar.com</a></font><=
+/div><div dir=3D"ltr"><font color=3D"#444444"><font face=3D"Arial, sans-ser=
+if">(650) 265-0648</font><span style=3D"font-family:Arial,sans-serif">=C2=
+=A0</span></font></div><div dir=3D"ltr"><font color=3D"#444444"><span style=
+=3D"font-family:Arial,sans-serif"><br></span></font></div><div dir=3D"ltr">=
+<font color=3D"#444444"><span style=3D"font-family:Arial,sans-serif"><img s=
+rc=3D"https://addepar.com/assets/logo/addepar-logo-dark-150px.png" width=3D=
+"96" height=3D"17"><br></span></font></div></div><p></p></div></div></div><=
+/div></div></div></div></div></div></div></div></div></div></div></div></di=
+v></div><br></div><br><div class=3D"gmail_quote"><div dir=3D"ltr" class=3D"=
+gmail_attr">On Thu, Mar 2, 2023 at 8:51=E2=80=AFAM Matt Sperling &lt;<a hre=
+f=3D"mailto:Matt@addepar.com" target=3D"_blank">Matt@addepar.com</a>&gt; wr=
+ote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px=
+ 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"><div dir=3D=
+"ltr">Because I don&#39;t have a GitHub seat, I&#39;ve relied on assurances=
+ and the review of others regarding removal of Addepar-specific info.=C2=A0=
+ I have not done my own review.=C2=A0 That probably won&#39;t scale with ou=
+r open source practices, so let me look into getting GitHub access=C2=A0and=
+ then I can review this before we release.=C2=A0<br clear=3D"all"><div><div=
+ dir=3D"ltr"><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><=
+div><div dir=3D"ltr"><div><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr=
+"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><p></=
+p><div style=3D"background-color:rgb(255,255,255)"><div dir=3D"ltr"><b><fon=
+t face=3D"georgia, serif" size=3D"4" color=3D"#134f5c">Matt Sperling</font>=
+<br></b><b><font color=3D"#444444"><span style=3D"font-family:Arial,sans-se=
+rif">Associate General Counsel</span></font></b><font face=3D"Arial, sans-s=
+erif" style=3D"color:rgb(34,34,34);font-family:arial,sans-serif"><br></font=
+></div><div><font face=3D"Arial, sans-serif" color=3D"#444444"><a href=3D"m=
+ailto:matt@addepar.com" target=3D"_blank">matt@addepar.com</a></font></div>=
+<div dir=3D"ltr"><font color=3D"#444444"><font face=3D"Arial, sans-serif">(=
+650) 265-0648</font><span style=3D"font-family:Arial,sans-serif">=C2=A0</sp=
+an></font></div><div dir=3D"ltr"><font color=3D"#444444"><span style=3D"fon=
+t-family:Arial,sans-serif"><br></span></font></div><div dir=3D"ltr"><font c=
+olor=3D"#444444"><span style=3D"font-family:Arial,sans-serif"><img src=3D"h=
+ttps://addepar.com/assets/logo/addepar-logo-dark-150px.png" width=3D"96" he=
+ight=3D"17"><br></span></font></div></div><p></p></div></div></div></div></=
+div></div></div></div></div></div></div></div></div></div></div></div></div=
+><br></div><br><div class=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_a=
+ttr">On Thu, Mar 2, 2023 at 8:40=E2=80=AFAM Karen Brooks &lt;<a href=3D"mai=
+lto:karen.brooks@addepar.com" target=3D"_blank">karen.brooks@addepar.com</a=
+>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px=
+ 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"><di=
+v dir=3D"ltr">Hi JB - Quick follow up here, the SecEng team found secrets i=
+n clear text in the ARCADE code in their ticket. Have these been removed? I=
+f not, please let us know once they&#39;re cleaned up,=C2=A0we shouldn&#39;=
+t publish code with hardcoded secrets.<div><br></div><div>Matt - I recall y=
+ou were also going to confirm there&#39;s no client references or other app=
+arent information disclosure as a sanity check. Was this done as part of yo=
+ur review?</div><div><br></div><div><br></div></div><br><div class=3D"gmail=
+_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Wed, Mar 1, 2023 at 12:01 =
+PM J.B. Zimmerman &lt;<a href=3D"mailto:jb.zimmerman@addepar.com" target=3D=
+"_blank">jb.zimmerman@addepar.com</a>&gt; wrote:<br></div><blockquote class=
+=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rg=
+b(204,204,204);padding-left:1ex"><div dir=3D"ltr">No worry, thanks!=C2=A0<b=
+r></div><br><div class=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr=
+">On Wed, Mar 1, 2023 at 11:33=E2=80=AFAM Karen Brooks &lt;<a href=3D"mailt=
+o:karen.brooks@addepar.com" target=3D"_blank">karen.brooks@addepar.com</a>&=
+gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0=
+px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"><div =
+dir=3D"ltr">Appreciate the ping, JB, I didn&#39;t see your last email. Will=
+ reach out 1:1.</div><br><div class=3D"gmail_quote"><div dir=3D"ltr" class=
+=3D"gmail_attr">On Wed, Mar 1, 2023 at 11:20 AM J.B. Zimmerman &lt;<a href=
+=3D"mailto:jb.zimmerman@addepar.com" target=3D"_blank">jb.zimmerman@addepar=
+.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"mar=
+gin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1=
+ex"><div dir=3D"ltr">Checking in on this.=C2=A0 Am I clear to publish the c=
+ode?=C2=A0 Thanks!<br><div><br></div><div>JB</div></div><br><div class=3D"g=
+mail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Mon, Feb 13, 2023 at 1=
+2:20=E2=80=AFPM J.B. Zimmerman &lt;<a href=3D"mailto:jb.zimmerman@addepar.c=
+om" target=3D"_blank">jb.zimmerman@addepar.com</a>&gt; wrote:<br></div><blo=
+ckquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left=
+:1px solid rgb(204,204,204);padding-left:1ex"><div dir=3D"ltr">Here you go.=
+=C2=A0<a href=3D"https://addepar.atlassian.net/browse/SECENG-1587" target=
+=3D"_blank">https://addepar.atlassian.net/browse/SECENG-1587</a><br></div><=
+br><div class=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Mon,=
+ Feb 13, 2023 at 8:56 AM Karen Brooks &lt;<a href=3D"mailto:karen.brooks@ad=
+depar.com" target=3D"_blank">karen.brooks@addepar.com</a>&gt; wrote:<br></d=
+iv><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;bord=
+er-left:1px solid rgb(204,204,204);padding-left:1ex"><div dir=3D"ltr">J.B. =
+- Please send me the ticket with the results of the SecEng scan.<div><br></=
+div><div>Thanks,<br>Karen</div></div><br><div class=3D"gmail_quote"><div di=
+r=3D"ltr" class=3D"gmail_attr">On Fri, Feb 10, 2023 at 4:26 PM Matt Sperlin=
+g &lt;<a href=3D"mailto:Matt@addepar.com" target=3D"_blank">Matt@addepar.co=
+m</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin=
+:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"=
+><div dir=3D"auto">All set from Legal.=C2=A0</div><br><div class=3D"gmail_q=
+uote"><div dir=3D"ltr" class=3D"gmail_attr">On Fri, Feb 10, 2023, 12:28 PM =
+J.B. Zimmerman &lt;<a href=3D"mailto:jb.zimmerman@addepar.com" target=3D"_b=
+lank">jb.zimmerman@addepar.com</a>&gt; wrote:<br></div><blockquote class=3D=
+"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(2=
+04,204,204);padding-left:1ex"><div dir=3D"ltr">Hello folks!=C2=A0 A quick u=
+pdate, I&#39;m looking to push forward with the open sourcing of the ARCADE=
+ code.=C2=A0 Recent updates - Matt S. has looked at the licenses in the rep=
+o (<a href=3D"https://github.com/addepar/open-arcade" rel=3D"noreferrer" ta=
+rget=3D"_blank">https://github.com/addepar/open-arcade</a>) and confirmed t=
+hat they are appropriate.=C2=A0 In addition, Henry Prince did a scan of the=
+ repository and came up with a list of what he called false positives - out=
+ of caution, Ike Levy has removed most of those and confirmed the others ar=
+e not secret hashes where appropriate, and then recleaned the repository to=
+ a state where it can be published.<div><br></div><div>Are there any other =
+steps I need to follow before making this repository available to the publi=
+c?</div><div><br></div><div>Thanks!</div><div>JB</div></div><br><div class=
+=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Tue, Dec 13, 2022=
+ at 8:56 AM J.B. Zimmerman &lt;<a href=3D"mailto:jb.zimmerman@addepar.com" =
+rel=3D"noreferrer" target=3D"_blank">jb.zimmerman@addepar.com</a>&gt; wrote=
+:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.=
+8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"><div dir=3D"lt=
+r">That copyright is from legacy code that went *into* the project.=C2=A0 W=
+e will add whatever copyright legal recommends on what is published.<br><di=
+v><br></div><div>JB</div></div><br><div class=3D"gmail_quote"><div dir=3D"l=
+tr" class=3D"gmail_attr">On Tue, Dec 13, 2022 at 8:46 AM Karen Brooks &lt;<=
+a href=3D"mailto:karen.brooks@addepar.com" rel=3D"noreferrer" target=3D"_bl=
+ank">karen.brooks@addepar.com</a>&gt; wrote:<br></div><blockquote class=3D"=
+gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(20=
+4,204,204);padding-left:1ex"><div dir=3D"ltr">Thanks, Matt. Can you clarify=
+ if this will be copyrighted as Addepar software, or a personal copyright? =
+The current license is personal:<div><i><span style=3D"color:rgb(29,28,29);=
+font-family:Slack-Lato,Slack-Fractions,appleLogo,sans-serif;font-variant-li=
+gatures:common-ligatures;background-color:rgb(248,248,248)">Copyright (c) 2=
+012-2018 Isaac (.ike) Levy &lt;</span><a aria-haspopup=3D"menu" aria-expand=
+ed=3D"false" href=3D"mailto:ike@blackskyresearch.net" rel=3D"noopener noref=
+errer noreferrer" style=3D"box-sizing:inherit;text-decoration-line:none;fon=
+t-family:Slack-Lato,Slack-Fractions,appleLogo,sans-serif;font-variant-ligat=
+ures:common-ligatures;background-color:rgb(248,248,248)" target=3D"_blank">=
+ike@blackskyresearch.net<span aria-label=3D"(opens in new tab)" style=3D"bo=
+x-sizing:inherit"></span></a><span style=3D"color:rgb(29,28,29);font-family=
+:Slack-Lato,Slack-Fractions,appleLogo,sans-serif;font-variant-ligatures:com=
+mon-ligatures;background-color:rgb(248,248,248)">&gt;.</span><br style=3D"b=
+ox-sizing:inherit;color:rgb(29,28,29);font-family:Slack-Lato,Slack-Fraction=
+s,appleLogo,sans-serif;font-variant-ligatures:common-ligatures;background-c=
+olor:rgb(248,248,248)"><span style=3D"color:rgb(29,28,29);font-family:Slack=
+-Lato,Slack-Fractions,appleLogo,sans-serif;font-variant-ligatures:common-li=
+gatures;background-color:rgb(248,248,248)">All rights reserved.</span>=C2=
+=A0</i></div><div><br></div><div>If this changes to Addepar copyrighted sof=
+tware, we should include a final security review/scan, so any critical vuln=
+erabilities can be remediated before we publish.</div><div><br></div><div>K=
+aren</div></div><br><div class=3D"gmail_quote"><div dir=3D"ltr" class=3D"gm=
+ail_attr">On Mon, Dec 12, 2022 at 7:26 PM Matt Sperling &lt;<a href=3D"mail=
+to:Matt@addepar.com" rel=3D"noreferrer" target=3D"_blank">Matt@addepar.com<=
+/a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0=
+px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"><=
+div dir=3D"ltr">Hi Karen,<div><br></div><div>JB and I spoke last week and J=
+B proactively mentioned that he intends to take=C2=A0whatever steps necessa=
+ry to remove or revert Addepar-specific aspects of the project.=C2=A0 Thank=
+s for sharing that reference material on scrubbing, we haven&#39;t released=
+=C2=A0code enough times to have our own playbooks.=C2=A0 Once we&#39;ve rem=
+oved=C2=A0references to Addepar code, users, tools, etc. (and anything else=
+ that doesn&#39;t belong) from the repo, no issues on my end and I&#39;m ha=
+ppy to do=C2=A0a=C2=A0code review before release.=C2=A0=C2=A0</div><div><br=
+></div><div>And just for the sake of completeness on Legal&#39;s philosophy=
+ here, these were my thoughts in our other thread:</div><div><div>1) Landin=
+g on the permissive side of this type of release strategy can improve the e=
+mployee experience of defunding projects.=C2=A0 You get to say, &quot;Yes, =
+Addepar is moving away from it, but no, the work doesn&#39;t go into a blac=
+k hole unless there&#39;s a real reason to put it in one.&quot;</div><div>2=
+) The effort needed from Legal to make it happen is very light, not a facto=
+r.</div><div>3) Many engineers I speak to care about the spirit of open sou=
+rce being both give and take, and we get an opportunity to walk the walk wh=
+en we can migrate projects into the open source community regardless of whe=
+ther they began as proprietary projects.</div></div><div><br></div><div>Alw=
+ays other factors to consider in the big picture, but glad to see we&#39;re=
+ willing to support this when it makes sense.=C2=A0</div><div><br></div><di=
+v>Best,<br>Matt<br clear=3D"all"><div><div dir=3D"ltr"><div dir=3D"ltr"><di=
+v><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div di=
+r=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"lt=
+r"><div dir=3D"ltr"><div dir=3D"ltr"><p></p><div style=3D"background-color:=
+rgb(255,255,255)"><div dir=3D"ltr"><b><font face=3D"georgia, serif" size=3D=
+"4" color=3D"#134f5c">Matt Sperling</font><br></b><b><font color=3D"#444444=
+"><span style=3D"font-family:Arial,sans-serif">Associate General Counsel</s=
+pan></font></b><font face=3D"Arial, sans-serif" style=3D"color:rgb(34,34,34=
+);font-family:arial,sans-serif"><br></font></div><div><font face=3D"Arial, =
+sans-serif" color=3D"#444444"><a href=3D"mailto:matt@addepar.com" rel=3D"no=
+referrer" target=3D"_blank">matt@addepar.com</a></font></div><div dir=3D"lt=
+r"><font color=3D"#444444"><font face=3D"Arial, sans-serif">(650) 265-0648<=
+/font><span style=3D"font-family:Arial,sans-serif">=C2=A0</span></font></di=
+v><div dir=3D"ltr"><font color=3D"#444444"><span style=3D"font-family:Arial=
+,sans-serif"><br></span></font></div><div dir=3D"ltr"><font color=3D"#44444=
+4"><span style=3D"font-family:Arial,sans-serif"><img src=3D"https://addepar=
+.com/assets/logo/addepar-logo-dark-150px.png" width=3D"96" height=3D"17"><b=
+r></span></font></div></div><p></p></div></div></div></div></div></div></di=
+v></div></div></div></div></div></div></div></div></div></div><br></div></d=
+iv><br><div class=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On =
+Mon, Dec 12, 2022 at 2:41 PM Karen Brooks &lt;<a href=3D"mailto:karen.brook=
+s@addepar.com" rel=3D"noreferrer" target=3D"_blank">karen.brooks@addepar.co=
+m</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin=
+:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"=
+><div dir=3D"ltr">Hi JB,<div><br></div><div>Legal owns the Open Source Guid=
+elines: here:=C2=A0<a href=3D"https://addepar.atlassian.net/wiki/spaces/EN/=
+pages/140744780/Open+Source+Guidelines" rel=3D"noreferrer" target=3D"_blank=
+">https://addepar.atlassian.net/wiki/spaces/EN/pages/140744780/Open+Source+=
+Guidelines</a><br></div><div><br></div><div><font color=3D"#666666">Text:=
+=C2=A0<i>&quot;<span style=3D"font-family:-apple-system,&quot;system-ui&quo=
+t;,&quot;Segoe UI&quot;,Roboto,Oxygen,Ubuntu,&quot;Fira Sans&quot;,&quot;Dr=
+oid Sans&quot;,&quot;Helvetica Neue&quot;,sans-serif">While Addepar owns se=
+veral=C2=A0</span><a href=3D"http://opensource.addepar.com/" rel=3D"nofollo=
+w noreferrer" style=3D"text-decoration-line:none;font-family:-apple-system,=
+&quot;system-ui&quot;,&quot;Segoe UI&quot;,Roboto,Oxygen,Ubuntu,&quot;Fira =
+Sans&quot;,&quot;Droid Sans&quot;,&quot;Helvetica Neue&quot;,sans-serif" ta=
+rget=3D"_blank">open source projects</a><span style=3D"font-family:-apple-s=
+ystem,&quot;system-ui&quot;,&quot;Segoe UI&quot;,Roboto,Oxygen,Ubuntu,&quot=
+;Fira Sans&quot;,&quot;Droid Sans&quot;,&quot;Helvetica Neue&quot;,sans-ser=
+if">, they are not very actively maintained. Furthermore, we have not relea=
+sed anything new recently. As such, we don&#39;t have good guidance on how =
+to release new projects yet. If you have a good candidate, please reach out=
+ to=C2=A0Addepar&#39;s Legal team (</span><a href=3D"mailto:legal@addepar.c=
+om" rel=3D"nofollow noreferrer" style=3D"text-decoration-line:none;font-fam=
+ily:-apple-system,&quot;system-ui&quot;,&quot;Segoe UI&quot;,Roboto,Oxygen,=
+Ubuntu,&quot;Fira Sans&quot;,&quot;Droid Sans&quot;,&quot;Helvetica Neue&qu=
+ot;,sans-serif" target=3D"_blank">legal@addepar.com</a><span style=3D"font-=
+family:-apple-system,&quot;system-ui&quot;,&quot;Segoe UI&quot;,Roboto,Oxyg=
+en,Ubuntu,&quot;Fira Sans&quot;,&quot;Droid Sans&quot;,&quot;Helvetica Neue=
+&quot;,sans-serif">).&quot;</span></i></font></div><div><br></div><div>Sinc=
+e Addepar isn&#39;t active in the open source arena, it=C2=A0looks like thi=
+s will be a judgment call from Legal&#39;s perspective. I agree with removi=
+ng all references to Addepar / AMP, and ensuring license terms are clear, a=
+nd recommend that Legal perform a four-eyes check to confirm the repo docs =
+are sanitized.=C2=A0</div><div><i><span style=3D"color:rgb(9,30,66);font-fa=
+mily:-apple-system,&quot;system-ui&quot;,&quot;Segoe UI&quot;,Roboto,Oxygen=
+,Ubuntu,&quot;Fira Sans&quot;,&quot;Droid Sans&quot;,&quot;Helvetica Neue&q=
+uot;,sans-serif"><br></span></i></div><div><font color=3D"#091e42" face=3D"=
+-apple-system, system-ui, Segoe UI, Roboto, Oxygen, Ubuntu, Fira Sans, Droi=
+d Sans, Helvetica Neue, sans-serif">Matt - If it&#39;s helpful, Google publ=
+ishes their internal open source process publicly. It includes suggested se=
+arch commands to help confirm the project has been scrubbed before publishi=
+ng:=C2=A0</font></div><div><ul><li><a href=3D"https://opensource.google/doc=
+umentation/reference/releasing" rel=3D"noreferrer" target=3D"_blank">https:=
+//opensource.google/documentation/reference/releasing</a>=C2=A0</li><li><a =
+href=3D"https://opensource.google/documentation/reference/releasing/prepari=
+ng#scrub-the-comments" rel=3D"noreferrer" target=3D"_blank">https://opensou=
+rce.google/documentation/reference/releasing/preparing#scrub-the-comments</=
+a><br></li></ul></div><div><br></div><div>Best,</div><div>Karen</div></div>=
+<br><div class=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Mon=
+, Dec 12, 2022 at 7:39 AM J.B. Zimmerman &lt;<a href=3D"mailto:jb.zimmerman=
+@addepar.com" rel=3D"noreferrer" target=3D"_blank">jb.zimmerman@addepar.com=
+</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:=
+0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">=
+<div dir=3D"ltr">Karen-<div><br></div><div>=C2=A0 With Mitch, Matt and Ruch=
+ir&#39;s=C2=A0approval, I would like to proceed with making the ARCADE tool=
+ing and documentation available for open-source use.=C2=A0 We have a &#39;s=
+anitized&#39; version of the repository which has had (to the best of our k=
+nowledge) all Addepar-specific information removed, including being publish=
+ed as a squash commit to remove commit message leakage.=C2=A0 We would be p=
+ublishing it &#39;as is&#39; under (I believe, Matt said) the BSD license.<=
+/div><div><br></div><div>=C2=A0 With that in mind, are there any examinatio=
+ns, audits or mechanical scans you would like me to have done on this new c=
+ode repo (&#39;open-arcade&#39;) before proceeding?<br clear=3D"all"><div><=
+br></div><div>Thanks,</div><div>JB</div>-- <br><div dir=3D"ltr"><div dir=3D=
+"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div style=3D"margin:0px;=
+padding:0px;color:rgb(51,51,51)"><div style=3D"margin:0px;padding:0px"><fon=
+t face=3D"arial, helvetica, sans-serif" size=3D"2">J.B. Zimmerman</font></d=
+iv><div style=3D"margin:0px;padding:0px"><font face=3D"arial, helvetica, sa=
+ns-serif" size=3D"2">Sr. Director, Engineering |=C2=A0<a href=3D"https://ad=
+depar.com/" rel=3D"nofollow noreferrer" style=3D"color:rgb(53,114,176)" tar=
+get=3D"_blank">Addepar</a></font></div><div style=3D"margin:0px;padding:0px=
+"><span style=3D"font-family:arial,helvetica,sans-serif;color:rgb(34,34,34)=
+">335 Madison Ave Ste. #2501, New York, NY 10017</span><br></div></div><div=
+ style=3D"margin:0px;padding:0px"><span style=3D"display:inline-block;max-w=
+idth:100%"><img src=3D"https://addepar.com/assets/logo/addepar-logo-dark-15=
+0px.png"><br></span></div></div></div></div></div></div></div></div></div>
+</blockquote></div>
+</blockquote></div>
+</blockquote></div>
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div style=3D=
+"margin:0px;padding:0px;color:rgb(51,51,51)"><div style=3D"margin:0px;paddi=
+ng:0px"><font face=3D"arial, helvetica, sans-serif" size=3D"2">J.B. Zimmerm=
+an</font></div><div style=3D"margin:0px;padding:0px"><font face=3D"arial, h=
+elvetica, sans-serif" size=3D"2">Sr. Director, Engineering |=C2=A0<a href=
+=3D"https://addepar.com/" rel=3D"nofollow noreferrer" style=3D"color:rgb(53=
+,114,176)" target=3D"_blank">Addepar</a></font></div><div style=3D"margin:0=
+px;padding:0px"><span style=3D"font-family:arial,helvetica,sans-serif;color=
+:rgb(34,34,34)">335 Madison Ave Ste. #2501, New York, NY 10017</span><br></=
+div></div><div style=3D"margin:0px;padding:0px"><span style=3D"display:inli=
+ne-block;max-width:100%"><img src=3D"https://addepar.com/assets/logo/addepa=
+r-logo-dark-150px.png"><br></span></div></div></div></div></div></div></div=
+>
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div style=3D=
+"margin:0px;padding:0px;color:rgb(51,51,51)"><div style=3D"margin:0px;paddi=
+ng:0px"><font face=3D"arial, helvetica, sans-serif" size=3D"2">J.B. Zimmerm=
+an</font></div><div style=3D"margin:0px;padding:0px"><font face=3D"arial, h=
+elvetica, sans-serif" size=3D"2">Sr. Director, Engineering |=C2=A0<a href=
+=3D"https://addepar.com/" rel=3D"nofollow noreferrer" style=3D"color:rgb(53=
+,114,176)" target=3D"_blank">Addepar</a></font></div><div style=3D"margin:0=
+px;padding:0px"><span style=3D"font-family:arial,helvetica,sans-serif;color=
+:rgb(34,34,34)">335 Madison Ave Ste. #2501, New York, NY 10017</span><br></=
+div></div><div style=3D"margin:0px;padding:0px"><span style=3D"display:inli=
+ne-block;max-width:100%"><img src=3D"https://addepar.com/assets/logo/addepa=
+r-logo-dark-150px.png"><br></span></div></div></div></div></div></div></div=
+>
+</blockquote></div>
+</blockquote></div>
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div style=3D=
+"margin:0px;padding:0px;color:rgb(51,51,51)"><div style=3D"margin:0px;paddi=
+ng:0px"><font face=3D"arial, helvetica, sans-serif" size=3D"2">J.B. Zimmerm=
+an</font></div><div style=3D"margin:0px;padding:0px"><font face=3D"arial, h=
+elvetica, sans-serif" size=3D"2">Sr. Director, Engineering |=C2=A0<a href=
+=3D"https://addepar.com/" rel=3D"nofollow" style=3D"color:rgb(53,114,176)" =
+target=3D"_blank">Addepar</a></font></div><div style=3D"margin:0px;padding:=
+0px"><span style=3D"font-family:arial,helvetica,sans-serif;color:rgb(34,34,=
+34)">335 Madison Ave Ste. #2501, New York, NY 10017</span><br></div></div><=
+div style=3D"margin:0px;padding:0px"><span style=3D"display:inline-block;ma=
+x-width:100%"><img src=3D"https://addepar.com/assets/logo/addepar-logo-dark=
+-150px.png"><br></span></div></div></div></div></div></div></div>
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div style=3D=
+"margin:0px;padding:0px;color:rgb(51,51,51)"><div style=3D"margin:0px;paddi=
+ng:0px"><font face=3D"arial, helvetica, sans-serif" size=3D"2">J.B. Zimmerm=
+an</font></div><div style=3D"margin:0px;padding:0px"><font face=3D"arial, h=
+elvetica, sans-serif" size=3D"2">Sr. Director, Engineering |=C2=A0<a href=
+=3D"https://addepar.com/" rel=3D"nofollow" style=3D"color:rgb(53,114,176)" =
+target=3D"_blank">Addepar</a></font></div><div style=3D"margin:0px;padding:=
+0px"><span style=3D"font-family:arial,helvetica,sans-serif;color:rgb(34,34,=
+34)">335 Madison Ave Ste. #2501, New York, NY 10017</span><br></div></div><=
+div style=3D"margin:0px;padding:0px"><span style=3D"display:inline-block;ma=
+x-width:100%"><img src=3D"https://addepar.com/assets/logo/addepar-logo-dark=
+-150px.png"><br></span></div></div></div></div></div></div></div>
+</blockquote></div>
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div style=3D=
+"margin:0px;padding:0px;color:rgb(51,51,51)"><div style=3D"margin:0px;paddi=
+ng:0px"><font face=3D"arial, helvetica, sans-serif" size=3D"2">J.B. Zimmerm=
+an</font></div><div style=3D"margin:0px;padding:0px"><font face=3D"arial, h=
+elvetica, sans-serif" size=3D"2">Sr. Director, Engineering |=C2=A0<a href=
+=3D"https://addepar.com/" rel=3D"nofollow" style=3D"color:rgb(53,114,176)" =
+target=3D"_blank">Addepar</a></font></div><div style=3D"margin:0px;padding:=
+0px"><span style=3D"font-family:arial,helvetica,sans-serif;color:rgb(34,34,=
+34)">335 Madison Ave Ste. #2501, New York, NY 10017</span><br></div></div><=
+div style=3D"margin:0px;padding:0px"><span style=3D"display:inline-block;ma=
+x-width:100%"><img src=3D"https://addepar.com/assets/logo/addepar-logo-dark=
+-150px.png"><br></span></div></div></div></div></div></div></div>
+</blockquote></div>
+</blockquote></div>
+</blockquote></div>
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div style=3D=
+"margin:0px;padding:0px;color:rgb(51,51,51)"><div style=3D"margin:0px;paddi=
+ng:0px"><font face=3D"arial, helvetica, sans-serif" size=3D"2">J.B. Zimmerm=
+an</font></div><div style=3D"margin:0px;padding:0px"><font face=3D"arial, h=
+elvetica, sans-serif" size=3D"2">Sr. Director, Engineering |=C2=A0<a href=
+=3D"https://addepar.com/" rel=3D"nofollow" style=3D"color:rgb(53,114,176)" =
+target=3D"_blank">Addepar</a></font></div><div style=3D"margin:0px;padding:=
+0px"><span style=3D"font-family:arial,helvetica,sans-serif;color:rgb(34,34,=
+34)">335 Madison Ave Ste. #2501, New York, NY 10017</span><br></div></div><=
+div style=3D"margin:0px;padding:0px"><span style=3D"display:inline-block;ma=
+x-width:100%"><img src=3D"https://addepar.com/assets/logo/addepar-logo-dark=
+-150px.png"><br></span></div></div></div></div></div></div></div></div>
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+ class=3D"gmail_signature"><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div=
+ dir=3D"ltr"><div style=3D"margin:0px;padding:0px;color:rgb(51,51,51)"><div=
+ style=3D"margin:0px;padding:0px"><font face=3D"arial, helvetica, sans-seri=
+f" size=3D"2">J.B. Zimmerman</font></div><div style=3D"margin:0px;padding:0=
+px"><font face=3D"arial, helvetica, sans-serif" size=3D"2">Sr. Director, En=
+gineering |=C2=A0<a href=3D"https://addepar.com/" rel=3D"nofollow" style=3D=
+"color:rgb(53,114,176)" target=3D"_blank">Addepar</a></font></div><div styl=
+e=3D"margin:0px;padding:0px"><span style=3D"font-family:arial,helvetica,san=
+s-serif;color:rgb(34,34,34)">335 Madison Ave Ste. #2501, New York, NY 10017=
+</span><br></div></div><div style=3D"margin:0px;padding:0px"><span style=3D=
+"display:inline-block;max-width:100%"><img src=3D"https://addepar.com/asset=
+s/logo/addepar-logo-dark-150px.png"><br></span></div></div></div></div></di=
+v></div></div>
+</blockquote></div><br clear=3D"all"><div><br></div><span class=3D"gmail_si=
+gnature_prefix">-- </span><br><div dir=3D"ltr" class=3D"gmail_signature"><d=
+iv dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div style=3D"ma=
+rgin:0px;padding:0px;color:rgb(51,51,51)"><div style=3D"margin:0px;padding:=
+0px"><font face=3D"arial, helvetica, sans-serif" size=3D"2">J.B. Zimmerman<=
+/font></div><div style=3D"margin:0px;padding:0px"><font face=3D"arial, helv=
+etica, sans-serif" size=3D"2">Sr. Director, Engineering |=C2=A0<a href=3D"h=
+ttps://addepar.com/" rel=3D"nofollow" style=3D"color:rgb(53,114,176)" targe=
+t=3D"_blank">Addepar</a></font></div><div style=3D"margin:0px;padding:0px">=
+<span style=3D"font-family:arial,helvetica,sans-serif;color:rgb(34,34,34)">=
+335 Madison Ave 25th fl, New York, NY 10017</span><br></div></div><div styl=
+e=3D"margin:0px;padding:0px"><span style=3D"display:inline-block;max-width:=
+100%"><img src=3D"https://addepar.com/assets/logo/addepar-logo-dark-150px.p=
+ng"><br></span></div></div></div></div></div></div></div>
+</blockquote></div>
+</div><br clear=3D"all"><div><br></div><span class=3D"gmail_signature_prefi=
+x">-- </span><br><div dir=3D"ltr" class=3D"gmail_signature" data-smartmail=
+=3D"gmail_signature"><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=
+=3D"ltr"><div style=3D"margin:0px;padding:0px;color:rgb(51,51,51)"><div sty=
+le=3D"margin:0px;padding:0px"><font face=3D"arial, helvetica, sans-serif" s=
+ize=3D"2">J.B. Zimmerman</font></div><div style=3D"margin:0px;padding:0px">=
+<font face=3D"arial, helvetica, sans-serif" size=3D"2">Sr. Director, Engine=
+ering |=C2=A0<a href=3D"https://addepar.com/" rel=3D"nofollow" style=3D"col=
+or:rgb(53,114,176)" target=3D"_blank">Addepar</a></font></div><div style=3D=
+"margin:0px;padding:0px"><span style=3D"font-family:arial,helvetica,sans-se=
+rif;color:rgb(34,34,34)">335 Madison Ave 25th fl, New York, NY 10017</span>=
+<br></div></div><div style=3D"margin:0px;padding:0px"><span style=3D"displa=
+y:inline-block;max-width:100%"><img src=3D"https://addepar.com/assets/logo/=
+addepar-logo-dark-150px.png"><br></span></div></div></div></div></div></div=
+></div></div></div>
+
+--000000000000f424cc060772be33--
